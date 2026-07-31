@@ -181,7 +181,7 @@ class MotionApp(tk.Tk):
 
         # ================= LEFT SIDEBAR =================
         left_frame = ttk.Frame(top_paned, width=400, padding=4)
-        top_paned.add(left_frame, weight=0)
+        top_paned.add(left_frame, weight=1)
 
         # 1. Project Hierarchy Tree
         tree_frame = ttk.Frame(left_frame)
