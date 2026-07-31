@@ -2,7 +2,7 @@
 #i now need to edit the behaviour of th fase and durata text boxes in the leggi. in editor profilo unità asse x needs to be a drop down menu where you select between ° and s. based on the selection durata ciclo should change unit of measue and its value should be the length of the x axis of the plots. based on that same selection in the editor legge one between fase and durata shoul gray out. is s is selected then fase should be greyed out and if ° is selected then durata shoul be grayed out. the one not greyed out is the one dictating the duration of that legge on the x axis. 
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import numpy as np
 
 import matplotlib
@@ -13,6 +13,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from motion.core.segment import MotionSegment
 from motion.core.cam_motion import compute_cam_motion
+from motion.ibl_export import export_to_ibl, export_all_data
 
 from ui.segment_editor import SegmentEditor
 from ui.motion_list import MotionList
@@ -164,6 +165,17 @@ class MotionApp(tk.Tk):
         # Strumenti menu
         tools_menu = tk.Menu(menubar, tearoff=0)
         tools_menu.add_command(label="Nuovo marker", command=self.add_marker)
+
+        export_menu = tk.Menu(tools_menu, tearoff=0)
+        export_menu.add_command(label="Spostamento", command=lambda: export_to_ibl(self.project, "displacement"))
+        export_menu.add_command(label="Velocità", command=lambda: export_to_ibl(self.project, "speed"))
+        export_menu.add_command(label="Accelerazione", command=lambda: export_to_ibl(self.project, "acceleration"))
+        export_menu.add_command(label="Jerk", command=lambda: export_to_ibl(self.project, "jerk"))
+        tools_menu.add_cascade(label="Esporta IBL", menu=export_menu)
+        
+        tools_menu.add_command(label="Esporta CSV", command=lambda: export_all_data(self.project, "csv"))
+        tools_menu.add_command(label="Esporta TXT", command=lambda: export_all_data(self.project, "txt"))
+
         menubar.add_cascade(label="Strumenti", menu=tools_menu)
 
         menubar.add_cascade(label="Parametrizzazione", menu=tk.Menu(menubar, tearoff=0))
@@ -746,6 +758,7 @@ class MotionApp(tk.Tk):
         self.project["markers"].append(marker)
         self._populate_tree()
         self.calculate()
+
 
     # ============================
     # CALCULATION & PLOTTING
