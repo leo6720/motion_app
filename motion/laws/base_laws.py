@@ -116,7 +116,7 @@ def _trapezoidal_generalized(tau, params=None):
 
         elif i == 4:
             # 0 -> -Amax
-            j[mask] = -np.sin(np.pi * tau_local / 2)
+            j[mask] = -np.cos(np.pi * tau_local / 2)
 
         elif i == 5:
             # -Amax plateau
@@ -124,7 +124,7 @@ def _trapezoidal_generalized(tau, params=None):
 
         elif i == 6:
             # -Amax -> 0
-            j[mask] = np.cos(np.pi * tau_local / 2)
+            j[mask] = np.sin(np.pi * tau_local / 2)
 
     dt = tau[1] - tau[0] if len(tau) > 1 else 1.0
     a = np.zeros_like(tau)
