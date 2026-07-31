@@ -128,7 +128,6 @@ class MotionApp(tk.Tk):
         self.project_tree = ttk.Treeview(tree_frame, show="tree")
         self.project_tree.pack(fill=tk.BOTH, expand=True)
         self.project_tree.bind("<<TreeviewSelect>>", self._on_tree_select)
-        self.project_tree.bind("<Button-1>", self._on_tree_click)
         self.project_tree.bind("<Double-1>", self._on_tree_double_click)
         
         # Right-click context menu
@@ -236,28 +235,15 @@ class MotionApp(tk.Tk):
             m_node = self.project_tree.insert(m_root, "end", text=m_text)
             self.node_map[m_node] = ("marker", m_idx)
 
-    def _on_tree_click(self, event):
-        item_id = self.project_tree.identify_row(event.y)
-        if not item_id:
-            return
+    def _toggle_profile_visibility(self, p_idx):
+        self.project["profiles"][p_idx]["visible"] = not self.project["profiles"][p_idx]["visible"]
+        self._populate_tree()
+        self.calculate()
 
-        # Check if the click was on the "checkbox" part of the text
-        # In a simple implementation, we check if the click is in the first few pixels or toggle on text
-        # For simplicity and robustness with 'show="tree"', we check the item text
-        node_type, data = self.node_map.get(item_id, (None, None))
-        
-        # Determine click horizontal position to see if it hit the icon area
-        # treeview.identify_column(event.x) returns #0 for the tree column
-        if self.project_tree.identify_column(event.x) == "#0":
-            # Toggle logic
-            if node_type == "profile":
-                self.project["profiles"][data]["visible"] = not self.project["profiles"][data]["visible"]
-                self._populate_tree()
-                self.calculate()
-            elif node_type == "marker":
-                self.project["markers"][data]["visible"] = not self.project["markers"][data]["visible"]
-                self._populate_tree()
-                self.calculate()
+    def _toggle_marker_visibility(self, m_idx):
+        self.project["markers"][m_idx]["visible"] = not self.project["markers"][m_idx]["visible"]
+        self._populate_tree()
+        self.calculate()
 
     def _on_tree_select(self, event):
         selected = self.project_tree.selection()
@@ -290,11 +276,17 @@ class MotionApp(tk.Tk):
 
         menu = tk.Menu(self, tearoff=0)
         if node_type == "profile":
+            label = "Nascondi Profilo" if self.project["profiles"][data]["visible"] else "Mostra Profilo"
+            menu.add_command(label=label, command=lambda: self._toggle_profile_visibility(data))
+            menu.add_separator()
             menu.add_command(label="Elimina Profilo", command=lambda: self._delete_profile_by_idx(data))
         elif node_type == "law":
             p_idx, l_idx = data
             menu.add_command(label="Elimina Legge", command=lambda: self._delete_law_by_idx(p_idx, l_idx))
         elif node_type == "marker":
+            label = "Nascondi Marker" if self.project["markers"][data]["visible"] else "Mostra Marker"
+            menu.add_command(label=label, command=lambda: self._toggle_marker_visibility(data))
+            menu.add_separator()
             menu.add_command(label="Elimina Marker", command=lambda: self._delete_marker_by_idx(data))
         else:
             return
