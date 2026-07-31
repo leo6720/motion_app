@@ -426,12 +426,12 @@ class MotionApp(tk.Tk):
         fields = [
             ("Nome", "name", str, ""),
             ("Punti per ciclo", "points_per_cycle", int, ""),
-            ("Posizione iniziale", "start_pos", float, " mm"),
-            ("Sfasamento iniziale", "start_phase", float, " s"),
+            ("Posizione iniziale", "start_pos", float, f" {profile.get('unit_y', 'mm')}"),
+            ("Sfasamento iniziale", "start_phase", float, f" {profile.get('unit_x', 's')}"),
             ("Modulo ciclo", "cycle_mod", str, ""),
             ("Unità (asse x)", "unit_x", str, ""),
             ("Velocità ciclo", "cycle_vel", float, " rpm"),
-            ("Durata ciclo", "cycle_duration", float, " s"),
+            ("Durata ciclo", "cycle_duration", float, f" {profile.get('unit_x', 's')}"),
             ("Unità (asse y)", "unit_y", str, ""),
         ]
 
@@ -455,9 +455,20 @@ class MotionApp(tk.Tk):
                         self.calculate()
                     return on_combobox_selected
                 widget.bind("<<ComboboxSelected>>", make_unit_x_updater(widget, profile))
+            elif key == "unit_y":
+                widget = ttk.Combobox(tab_gen, values=["mm", "cm", "m"], width=12, state="readonly")
+                raw_val = profile.get(key, "mm")
+                widget.set(raw_val)
+                widget.grid(row=i, column=1, sticky="e", pady=2)
+
+                def make_unit_y_updater(w, p):
+                    def on_combobox_selected(event):
+                        p["unit_y"] = w.get()
+                        self._show_profile_editor(p_idx)
+                        self.calculate()
+                    return on_combobox_selected
+                widget.bind("<<ComboboxSelected>>", make_unit_y_updater(widget, profile))
             else:
-                if key == "cycle_duration":
-                    unit = f" {profile.get('unit_x', 's')}"
                 entry = ttk.Entry(tab_gen, width=12)
                 raw_val = profile.get(key, "")
                 entry.insert(0, str(raw_val))
@@ -574,6 +585,7 @@ class MotionApp(tk.Tk):
         self._clear_editor()
         self.editor_container.config(text="Editor Marker")
         marker = self.project["markers"][m_idx]
+        unit_x = self.project["profiles"][0]["unit_x"] if self.project["profiles"] else "s"
 
         frame = ttk.Frame(self.editor_container, padding=5)
         frame.pack(fill=tk.BOTH, expand=True)
@@ -582,6 +594,7 @@ class MotionApp(tk.Tk):
         e_x = ttk.Entry(frame, width=10)
         e_x.insert(0, f"{marker['value']}")
         e_x.grid(row=0, column=1, sticky="w", pady=5)
+        ttk.Label(frame, text=unit_x).grid(row=0, column=2, sticky="w", padx=2, pady=5)
 
         ttk.Label(frame, text="Etichetta").grid(row=1, column=0, sticky="w", pady=5)
         e_lbl = ttk.Entry(frame, width=15)
@@ -593,7 +606,7 @@ class MotionApp(tk.Tk):
                 val = float(e_x.get())
                 marker["value"] = val
                 if not marker.get("custom_label", False):
-                    marker["label"] = f"x = {val}°"
+                    marker["label"] = f"x = {val}{unit_x}"
                     e_lbl.delete(0, tk.END)
                     e_lbl.insert(0, marker["label"])
                 self._populate_tree()
@@ -703,10 +716,11 @@ class MotionApp(tk.Tk):
             messagebox.showerror("Errore", "Inserisci un valore numerico valido.")
             return
 
+        unit_x = self.project["profiles"][0]["unit_x"] if self.project["profiles"] else "s"
         marker = {
             "value": val,
             "visible": True,
-            "label": f"x = {val}°",
+            "label": f"x = {val}{unit_x}",
             "custom_label": False
         }
         self.project["markers"].append(marker)
@@ -742,7 +756,7 @@ class MotionApp(tk.Tk):
             sum_laws = sum(l.get(key_name, 0.0) for l in profile["laws"])
             cycle_duration = profile.get("cycle_duration", sum_laws if sum_laws > 0 else 1.0)
 
-            segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0)) for l in profile["laws"]]
+            segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0), proportions=l.get("proportions")) for l in profile["laws"]]
             t, s, v, a, j = compute_cam_motion(segs)
 
             # Offset initial position

@@ -8,3 +8,4 @@ class MotionSegment:
     stroke: float
     duration: float
     params: Dict[str, Any] = field(default_factory=dict)
+    proportions: Any = None
