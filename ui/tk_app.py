@@ -90,7 +90,8 @@ class MotionApp(tk.Tk):
                             "parz_ini": 0.0,
                             "parz_fin": 0.013,
                             "cv": 2.0,
-                            "ca": 4.888
+                            "ca": 4.888,
+                            "proportions": [10, 20, 10, 0, 10, 20, 10]
                         },
                         {
                             "type": "dwell",
