@@ -100,26 +100,26 @@ def _trapezoidal_generalized(tau, params=None):
             tau_local = np.zeros_like(tau[mask])
 
         if i == 0:
-            # 1) cycloidal blend from a=0 to +Amax: j = Jmax * cos(pi * tau / 2)
+            # 1) cycloidal blend from a=0 to +Amax: starts at +1, goes to 0
             j[mask] = np.cos(np.pi * tau_local / 2.0)
         elif i == 1:
             # 2) constant acceleration +Amax: j = 0
             j[mask] = 0.0
         elif i == 2:
-            # 3) cycloidal blend from +Amax to 0: j = -Jmax * cos(pi * tau / 2)
-            j[mask] = -np.cos(np.pi * tau_local / 2.0)
+            # 3) cycloidal blend from +Amax to 0: starts at 0, goes to -1
+            j[mask] = -np.sin(np.pi * tau_local / 2.0)
         elif i == 3:
             # 4) constant velocity (duration = 0)
             j[mask] = 0.0
         elif i == 4:
-            # 5) cycloidal blend from 0 to -Amax: j = -Jmax * cos(pi * tau / 2)
-            j[mask] = -np.cos(np.pi * tau_local / 2.0)
+            # 5) cycloidal blend from 0 to -Amax: starts at 0, goes to -1
+            j[mask] = -np.sin(np.pi * tau_local / 2.0)
         elif i == 5:
             # 6) constant acceleration -Amax: j = 0
             j[mask] = 0.0
         elif i == 6:
-            # 7) cycloidal blend from -Amax to 0: j = Jmax * cos(pi * tau / 2)
-            j[mask] = np.cos(np.pi * tau_local / 2.0)
+            # 7) cycloidal blend from -Amax to 0: starts at -1 (or 0 rising to +1)
+            j[mask] = np.sin(np.pi * tau_local / 2.0)
 
     dt = tau[1] - tau[0] if len(tau) > 1 else 1.0
     a = np.zeros_like(tau)
