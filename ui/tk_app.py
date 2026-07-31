@@ -810,6 +810,9 @@ class MotionApp(tk.Tk):
                 j_ini_e = j_seg[0] if len(j_seg) > 0 else 0.0
                 j_fin_e = j_seg[-1] if len(j_seg) > 0 else 0.0
 
+                j_ini_t = j_seg[0] if len(j_seg) > 0 else 0.0
+                j_fin_t = j_seg[-1] if len(j_seg) > 0 else 0.0
+
                 # Dettaglio input row
                 self.detail_table.insert("", "end", values=(
                     l["name"], l.get("cv", "-"), l.get("ca", "-"),
@@ -819,8 +822,8 @@ class MotionApp(tk.Tk):
                     f"{l.get('v_fin', 0.0)} mm/s", f"{v_fin_e:.3f} mm/s",
                     f"{l.get('a_ini', 0.0)} mm/s²", f"{a_ini_e:.3f} mm/s²",
                     f"{l.get('a_fin', 0.0)} mm/s²", f"{a_fin_e:.3f} mm/s²",
-                    f"{j_seg[0]:.3f} mm/s³" if len(j_seg) > 0 else "0", f"{j_ini_e:.3f} mm/s³",
-                    f"{j_seg[-1]:.3f} mm/s³" if len(j_seg) > 0 else "0", f"{j_fin_e:.3f} mm/s³"
+                    f"{j_ini_t:.3f} mm/s³", f"{j_ini_e:.3f} mm/s³",
+                    f"{j_fin_t:.3f} mm/s³", f"{j_fin_e:.3f} mm/s³"
                 ))
 
                 # Max/min profilo row
