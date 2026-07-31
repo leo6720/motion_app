@@ -743,10 +743,6 @@ class MotionApp(tk.Tk):
             segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0)) for l in profile["laws"]]
             t, s, v, a, j = compute_cam_motion(segs)
 
-            # Scale t to match cycle_duration if sum_laws > 0 and different
-            if sum_laws > 0 and abs(sum_laws - cycle_duration) > 1e-6:
-                t = t * (cycle_duration / sum_laws)
-
             # Offset initial position
             s = s + profile["start_pos"] - s[0]
 
@@ -790,6 +786,10 @@ class MotionApp(tk.Tk):
                 ax = self.axes[row, col]
                 ax.set_title(titles[row][col])
                 ax.grid(True, linestyle="--", alpha=0.5)
+                for profile in self.project["profiles"]:
+                    if profile["visible"]:
+                        ax.set_xlim(left=0, right=profile.get("cycle_duration", 1.0))
+                        break
 
         self.fig.tight_layout()
         self.canvas.draw()
