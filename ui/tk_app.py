@@ -4,6 +4,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import numpy as np
+import ctypes
+import os
 
 import matplotlib
 matplotlib.use("TkAgg")
@@ -23,6 +25,11 @@ class MotionApp(tk.Tk):
 
     def __init__(self):
         super().__init__()
+
+        # Fix taskbar icon on Windows
+        if os.name == 'nt':
+            myappid = 'marchesini.motionapp.1.0'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
         self.title("Progettazione Camme")
         try:
