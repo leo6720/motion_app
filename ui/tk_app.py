@@ -688,9 +688,10 @@ class MotionApp(tk.Tk):
             "v_fin": 0.0,
             "a_fin": 0.0,
             "parz_ini": 0.0,
-            "parz_fin": 0.0,
+            "parz_fin": 0.0 if law_type != "trap_gen" else 0.25,
             "cv": 2.0 if law_type != "dwell" else "NaN",
-            "ca": 4.888 if law_type != "dwell" else "NaN"
+            "ca": 4.888 if law_type != "dwell" else "NaN",
+            "proportions": [10, 20, 10, 0, 10, 20, 10] if law_type == "trap_gen" else []
         }
         self.project["profiles"][p_idx]["laws"].append(law)
         self._populate_tree()
