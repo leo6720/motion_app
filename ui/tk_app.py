@@ -2,7 +2,7 @@
 #i now need to edit the behaviour of th fase and durata text boxes in the leggi. in editor profilo unità asse x needs to be a drop down menu where you select between ° and s. based on the selection durata ciclo should change unit of measue and its value should be the length of the x axis of the plots. based on that same selection in the editor legge one between fase and durata shoul gray out. is s is selected then fase should be greyed out and if ° is selected then durata shoul be grayed out. the one not greyed out is the one dictating the duration of that legge on the x axis. 
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import numpy as np
 
 import matplotlib
@@ -164,6 +164,14 @@ class MotionApp(tk.Tk):
         # Strumenti menu
         tools_menu = tk.Menu(menubar, tearoff=0)
         tools_menu.add_command(label="Nuovo marker", command=self.add_marker)
+
+        export_menu = tk.Menu(tools_menu, tearoff=0)
+        export_menu.add_command(label="Spostamento", command=lambda: self.export_ibl("displacement"))
+        export_menu.add_command(label="Velocità", command=lambda: self.export_ibl("speed"))
+        export_menu.add_command(label="Accelerazione", command=lambda: self.export_ibl("acceleration"))
+        export_menu.add_command(label="Jerk", command=lambda: self.export_ibl("jerk"))
+        tools_menu.add_cascade(label="Esporta IBL", menu=export_menu)
+
         menubar.add_cascade(label="Strumenti", menu=tools_menu)
 
         menubar.add_cascade(label="Parametrizzazione", menu=tk.Menu(menubar, tearoff=0))
@@ -746,6 +754,51 @@ class MotionApp(tk.Tk):
         self.project["markers"].append(marker)
         self._populate_tree()
         self.calculate()
+
+    def export_ibl(self, plot_type):
+        all_t = []
+        y_data = []
+
+        for profile in self.project["profiles"]:
+            if not profile["visible"] or not profile["laws"]:
+                continue
+
+            unit_x = profile.get("unit_x", "s")
+            key_name = "duration" if unit_x == "s" else "phase"
+            
+            segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0), proportions=l.get("proportions"), params={"proportions": l.get("proportions")} if l.get("proportions") is not None else {}) for l in profile["laws"]]
+            t, s, v, a, j = compute_cam_motion(segs)
+
+            s_offset = profile["start_pos"] - s[0]
+            s = s + s_offset
+
+            all_t = t
+            if plot_type == "displacement":
+                y_data = s
+            elif plot_type == "speed":
+                y_data = v
+            elif plot_type == "acceleration":
+                y_data = a
+            elif plot_type == "jerk":
+                y_data = j
+            break
+
+        if not all_t:
+            messagebox.showwarning("Attenzione", "Nessun dato visibile da esportare.")
+            return
+
+        filename = filedialog.asksaveasfilename(defaultextension=".ibl", filetypes=[("IBL files", "*.ibl"), ("All files", "*.*")])
+        if not filename:
+            return
+
+        try:
+            with open(filename, "w") as f:
+                f.write("open\narclength\nbegin section ! 1\nbegin curve ! 1\n")
+                for tx, ty in zip(all_t, y_data):
+                    f.write(f"{tx}\t{ty}\t0.0\n")
+            messagebox.showinfo("Successo", "File IBL esportato correttamente.")
+        except Exception as e:
+            messagebox.showerror("Errore", f"Impossibile salvare il file: {e}")
 
     # ============================
     # CALCULATION & PLOTTING
