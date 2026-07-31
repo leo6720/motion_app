@@ -61,18 +61,16 @@ def _trapezoidal_generalized(tau, params=None):
     # =========================
     # PARAMETRI
     # =========================
+    default_profile = [10, 20, 10, 0, 10, 20, 10]
     if params is None:
-        profile = [1,1,1,1,1,1,1]
+        profile = default_profile
     else:
-        profile = params.get("profile", params.get("proportions", [1,1,1,1,1,1,1]))
+        profile = params.get("profile", params.get("proportions", default_profile))
 
     profile = np.array(profile, dtype=float)
 
-    if len(profile) != 7:
-        raise ValueError("trap_gen richiede 7 segmenti")
-
-    if profile.sum() == 0:
-        raise ValueError("Somma segmenti nulla")
+    if len(profile) != 7 or profile.sum() == 0:
+        profile = np.array(default_profile, dtype=float)
 
     # normalizza a [0..1]
     profile = profile / profile.sum()
