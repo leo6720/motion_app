@@ -64,7 +64,7 @@ def _trapezoidal_generalized(tau, params=None):
     if params is None:
         profile = [1,1,1,1,1,1,1]
     else:
-        profile = params.get("profile", [1,1,1,1,1,1,1])
+        profile = params.get("profile", params.get("proportions", [1,1,1,1,1,1,1]))
 
     profile = np.array(profile, dtype=float)
 
