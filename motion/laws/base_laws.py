@@ -79,17 +79,27 @@ def _trapezoidal_generalized(tau, params=None):
     b = np.concatenate(([0.0], np.cumsum(profile)))
 
     # =========================
-    # JERK
+    # CONTINUOUS JERK
     # =========================
-    jerk_pattern = np.array([1, 0, -1, 0, -1, 0, 1], dtype=float)
-
+    # Costruiamo un jerk continuo (es. sinusoidale o raccordato) basato sui segmenti
     j = np.zeros_like(tau)
-
+    
+    # Usiamo transizioni morbide tra i livelli di jerk target [-1, 0, 1, 0, -1, 0, 1]
+    target_jerk = np.array([1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0], dtype=float)
+    
+    # Assegniamo i valori medi per ogniintervallo e raccordiamo con interpolazione lineare o sinusoidale
     for i in range(7):
-        mask = (tau >= b[i]) & (tau < b[i+1])
-        j[mask] = jerk_pattern[i]
+        mask = (tau >= b[i]) & (tau <= b[i+1])
+        if b[i+1] > b[i]:
+            local_tau = (tau[mask] - b[i]) / (b[i+1] - b[i])
+            # Transizione fluida (es. sinusoide) all'interno del sotto-intervallo o valore costante raccordato
+            start_j = target_jerk[i-1] if i > 0 else 0.0
+            end_j = target_jerk[i]
+            # Usiamo un raccordo a gobba di seno per continuità C0/C1 del jerk
+            j[mask] = start_j + (end_j - start_j) * (0.5 - 0.5 * np.cos(np.pi * local_tau))
+        else:
+            j[mask] = target_jerk[i]
 
-    # includi ultimo punto
     j[tau == 1.0] = 0.0
 
     # =========================
