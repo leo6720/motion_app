@@ -24,7 +24,7 @@ class MotionApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Progettazione Camme - Marchesini Group S.p.A.")
+        self.title("Progettazione Camme")
         try:
             self.iconbitmap("Motion_app_logo.ico")
         except Exception:
@@ -115,11 +115,11 @@ class MotionApp(tk.Tk):
         v_paned.pack(fill=tk.BOTH, expand=True)
 
         top_paned = ttk.PanedWindow(v_paned, orient=tk.HORIZONTAL)
-        v_paned.add(top_paned, weight=2)
+        v_paned.add(top_paned, weight=5)
 
         # ================= LEFT SIDEBAR =================
         left_frame = ttk.Frame(top_paned, width=400, padding=4)
-        top_paned.add(left_frame, weight=1)
+        top_paned.add(left_frame, weight=0)
 
         # 1. Project Hierarchy Tree
         tree_frame = ttk.Frame(left_frame)
@@ -147,7 +147,7 @@ class MotionApp(tk.Tk):
 
         # ================= RIGHT PLOTS (2x2 Grid) =================
         right_frame = ttk.Frame(top_paned, padding=2)
-        top_paned.add(right_frame, weight=3)
+        top_paned.add(right_frame, weight=1)
 
         self.fig = Figure(figsize=(8, 6))
         self.axes = self.fig.subplots(2, 2)
@@ -650,6 +650,7 @@ class MotionApp(tk.Tk):
                 }
 
             dialog.destroy()
+            self.title(f"Progettazione Camme - {name}")
             self._build_menu(full=True)
             self._build_ui()
             self._populate_tree()
