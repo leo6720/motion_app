@@ -13,7 +13,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from motion.core.segment import MotionSegment
 from motion.core.cam_motion import compute_cam_motion
-from motion.ibl_export import export_to_ibl
+from motion.ibl_export import export_to_ibl, export_all_data
 
 from ui.segment_editor import SegmentEditor
 from ui.motion_list import MotionList
@@ -172,6 +172,9 @@ class MotionApp(tk.Tk):
         export_menu.add_command(label="Accelerazione", command=lambda: export_to_ibl(self.project, "acceleration"))
         export_menu.add_command(label="Jerk", command=lambda: export_to_ibl(self.project, "jerk"))
         tools_menu.add_cascade(label="Esporta IBL", menu=export_menu)
+        
+        tools_menu.add_command(label="Esporta CSV", command=lambda: export_all_data(self.project, "csv"))
+        tools_menu.add_command(label="Esporta TXT", command=lambda: export_all_data(self.project, "txt"))
 
         menubar.add_cascade(label="Strumenti", menu=tools_menu)
 
