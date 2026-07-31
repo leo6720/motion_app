@@ -435,12 +435,6 @@ class MotionApp(tk.Tk):
             ("Unità (asse y)", "unit_y", str, ""),
         ]
 
-        # Compute total duration from laws based on unit_x
-        unit_x = profile.get("unit_x", "s")
-        total_dur = sum(l.get("duration" if unit_x == "s" else "phase", 0.0) for l in profile.get("laws", []))
-        if total_dur > 0:
-            profile["cycle_duration"] = total_dur
-
         for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
             if key == "unit_x":
@@ -453,8 +447,10 @@ class MotionApp(tk.Tk):
                     def on_combobox_selected(event):
                         val = w.get()
                         p["unit_x"] = val
-                        # Recalculate cycle_duration based on the new unit_x and laws
-                        p["cycle_duration"] = sum(l.get("duration" if val == "s" else "phase", 0.0) for l in p.get("laws", []))
+                        if val == "°":
+                            p["cycle_duration"] = 360.0
+                        else:
+                            p["cycle_duration"] = 18.0
                         self._show_profile_editor(p_idx)
                         self.calculate()
                     return on_combobox_selected
@@ -738,8 +734,18 @@ class MotionApp(tk.Tk):
             if not profile["visible"] or not profile["laws"]:
                 continue
 
-            segs = [MotionSegment(l["type"], l["stroke"], l["duration"]) for l in profile["laws"]]
+            unit_x = profile.get("unit_x", "s")
+            key_name = "duration" if unit_x == "s" else "phase"
+            
+            sum_laws = sum(l.get(key_name, 0.0) for l in profile["laws"])
+            cycle_duration = profile.get("cycle_duration", sum_laws if sum_laws > 0 else 1.0)
+
+            segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0)) for l in profile["laws"]]
             t, s, v, a, j = compute_cam_motion(segs)
+
+            # Scale t to match cycle_duration if sum_laws > 0 and different
+            if sum_laws > 0 and abs(sum_laws - cycle_duration) > 1e-6:
+                t = t * (cycle_duration / sum_laws)
 
             # Offset initial position
             s = s + profile["start_pos"] - s[0]
