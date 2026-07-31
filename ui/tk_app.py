@@ -352,10 +352,15 @@ class MotionApp(tk.Tk):
 
         tab_gen = ttk.Frame(nb, padding=5)
         nb.add(tab_gen, text="Input generici")
-        nb.add(ttk.Frame(nb), text="Input specifici")
-        nb.add(ttk.Frame(nb), text="Output")
+        
+        tab_spec = ttk.Frame(nb, padding=5)
+        nb.add(tab_spec, text="Input specifici")
+        
+        tab_out = ttk.Frame(nb, padding=5)
+        nb.add(tab_out, text="Output")
 
         if law["type"] == "dwell":
+            nb.tab(tab_spec, state="disabled")
             fields = [
                 ("Fase", f"{law['phase']} °"),
                 ("Durata", f"{law['duration']} s"),
@@ -379,11 +384,36 @@ class MotionApp(tk.Tk):
                 ("Unità (asse x)", "s"),
             ]
 
+            # Populate specific inputs for trapezoidale generalizzata
+            if law["type"] == "trap_gen":
+                prop_defaults = [10, 20, 10, 0, 10, 20, 10]
+                if "proportions" not in law:
+                    law["proportions"] = prop_defaults
+                
+                for i, val in enumerate(law["proportions"]):
+                    ttk.Label(tab_spec, text=f"Sezione {i+1}").grid(row=i, column=0, sticky="w", pady=2)
+                    entry = ttk.Entry(tab_spec, width=12)
+                    entry.insert(0, str(val))
+                    entry.grid(row=i, column=1, sticky="e", pady=2)
+                    
+                    # Bind changes to update the law proportions
+                    def make_updater(idx, ent):
+                        return lambda event: self._update_law_proportion(p_idx, l_idx, idx, ent.get())
+                    entry.bind("<KeyRelease>", make_updater(i, entry))
+
         for i, (label_text, val) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
             entry = ttk.Entry(tab_gen, width=12)
             entry.insert(0, val)
             entry.grid(row=i, column=1, sticky="e", pady=2)
+
+    def _update_law_proportion(self, p_idx, l_idx, prop_idx, val_str):
+        try:
+            val = float(val_str)
+            self.project["profiles"][p_idx]["laws"][l_idx]["proportions"][prop_idx] = val
+            self.calculate()
+        except ValueError:
+            pass
 
     def _show_marker_editor(self, m_idx):
         self._clear_editor()
@@ -402,6 +432,28 @@ class MotionApp(tk.Tk):
         e_lbl = ttk.Entry(frame, width=15)
         e_lbl.insert(0, marker["label"])
         e_lbl.grid(row=1, column=1, sticky="w", pady=5)
+
+        def on_x_change(event):
+            try:
+                val = float(e_x.get())
+                marker["value"] = val
+                if not marker.get("custom_label", False):
+                    marker["label"] = f"x = {val}°"
+                    e_lbl.delete(0, tk.END)
+                    e_lbl.insert(0, marker["label"])
+                self._populate_tree()
+                self.calculate()
+            except ValueError:
+                pass
+
+        def on_label_change(event):
+            marker["label"] = e_lbl.get()
+            marker["custom_label"] = True
+            self._populate_tree()
+            self.calculate()
+
+        e_x.bind("<KeyRelease>", on_x_change)
+        e_lbl.bind("<KeyRelease>", on_label_change)
 
     # ============================
     # PROJECT & MENU ACTIONS
@@ -487,7 +539,21 @@ class MotionApp(tk.Tk):
             self.calculate()
 
     def add_marker(self):
-        marker = {"value": 6.25, "visible": True, "label": "x = 6.25°"}
+        val_str = tk.simpledialog.askstring("Nuovo Marker", "Inserisci il valore x del marker:")
+        if val_str is None:
+            return
+        try:
+            val = float(val_str)
+        except ValueError:
+            messagebox.showerror("Errore", "Inserisci un valore numerico valido.")
+            return
+
+        marker = {
+            "value": val,
+            "visible": True,
+            "label": f"x = {val}°",
+            "custom_label": False
+        }
         self.project["markers"].append(marker)
         self._populate_tree()
         self.calculate()
