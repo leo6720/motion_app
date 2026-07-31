@@ -1,3 +1,4 @@
+#hello
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -421,22 +422,39 @@ class MotionApp(tk.Tk):
         nb.add(ttk.Frame(nb), text="Avanzate")
 
         fields = [
-            ("Nome", profile["name"]),
-            ("Punti per ciclo", str(profile["points_per_cycle"])),
-            ("Posizione iniziale", f"{profile['start_pos']} mm"),
-            ("Sfasamento iniziale", f"{profile['start_phase']} s"),
-            ("Modulo ciclo", profile["cycle_mod"]),
-            ("Unità (asse x)", profile["unit_x"]),
-            ("Velocità ciclo", f"{profile['cycle_vel']} rpm"),
-            ("Durata ciclo", f"{profile['cycle_duration']} s"),
-            ("Unità (asse y)", profile["unit_y"]),
+            ("Nome", "name", str, ""),
+            ("Punti per ciclo", "points_per_cycle", int, ""),
+            ("Posizione iniziale", "start_pos", float, " mm"),
+            ("Sfasamento iniziale", "start_phase", float, " s"),
+            ("Modulo ciclo", "cycle_mod", str, ""),
+            ("Unità (asse x)", "unit_x", str, ""),
+            ("Velocità ciclo", "cycle_vel", float, " rpm"),
+            ("Durata ciclo", "cycle_duration", float, " s"),
+            ("Unità (asse y)", "unit_y", str, ""),
         ]
 
-        for i, (label_text, val) in enumerate(fields):
+        for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
             entry = ttk.Entry(tab_gen, width=14)
-            entry.insert(0, val)
+            raw_val = profile.get(key, "")
+            entry.insert(0, f"{raw_val}{unit}")
             entry.grid(row=i, column=1, sticky="e", pady=2)
+
+            def make_profile_updater(k, t, u, ent):
+                def updater(event):
+                    val_str = ent.get()
+                    if u and val_str.endswith(u):
+                        val_str = val_str[:-len(u)]
+                    try:
+                        profile[k] = t(val_str.strip())
+                        if k == "name":
+                            self._populate_tree()
+                        self.calculate()
+                    except ValueError:
+                        pass
+                return updater
+
+            entry.bind("<KeyRelease>", make_profile_updater(key, val_type, unit, entry))
 
     def _show_law_editor(self, p_idx, l_idx):
         self._clear_editor()
@@ -459,26 +477,20 @@ class MotionApp(tk.Tk):
         if law["type"] == "dwell":
             nb.tab(tab_spec, state="disabled")
             fields = [
-                ("Fase", f"{law['phase']} °"),
-                ("Durata", f"{law['duration']} s"),
-                ("Unità (asse x)", "s"),
-                ("Velocità ciclo", f"{profile['cycle_vel']} rpm"),
-                ("Durata ciclo", f"{profile['cycle_duration']} s"),
+                ("Fase", "phase", float, " °"),
+                ("Durata", "duration", float, " s"),
             ]
         else:
             fields = [
-                ("Fase", f"{law['phase']} °"),
-                ("Durata", f"{law['duration']} s"),
-                ("Salto", f"{law['stroke']} mm"),
-                ("Velocità iniziale", f"{law['v_ini']} mm/s"),
-                ("Accelerazione iniziale", f"{law['a_ini']} mm/s²"),
-                ("Velocità finale", f"{law['v_fin']} mm/s"),
-                ("Accelerazione finale", f"{law['a_fin']} mm/s²"),
-                ("Continuita da sx", "No"),
-                ("Continuita da dx", "No"),
-                ("Parz. iniziale", f"{law['parz_ini']} s"),
-                ("Parz. finale", f"{law['parz_fin']} s"),
-                ("Unità (asse x)", "s"),
+                ("Fase", "phase", float, " °"),
+                ("Durata", "duration", float, " s"),
+                ("Salto", "stroke", float, " mm"),
+                ("Velocità iniziale", "v_ini", float, " mm/s"),
+                ("Accelerazione iniziale", "a_ini", float, " mm/s²"),
+                ("Velocità finale", "v_fin", float, " mm/s"),
+                ("Accelerazione finale", "a_fin", float, " mm/s²"),
+                ("Parz. iniziale", "parz_ini", float, " s"),
+                ("Parz. finale", "parz_fin", float, " s"),
             ]
 
             # Populate specific inputs for trapezoidale generalizzata
@@ -498,11 +510,26 @@ class MotionApp(tk.Tk):
                         return lambda event: self._update_law_proportion(p_idx, l_idx, idx, ent.get())
                     entry.bind("<KeyRelease>", make_updater(i, entry))
 
-        for i, (label_text, val) in enumerate(fields):
+        for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
             entry = ttk.Entry(tab_gen, width=12)
-            entry.insert(0, val)
+            raw_val = law.get(key, "")
+            entry.insert(0, f"{raw_val}{unit}")
             entry.grid(row=i, column=1, sticky="e", pady=2)
+
+            def make_law_updater(k, t, u, ent):
+                def updater(event):
+                    val_str = ent.get()
+                    if u and val_str.endswith(u):
+                        val_str = val_str[:-len(u)]
+                    try:
+                        law[k] = t(val_str.strip())
+                        self.calculate()
+                    except ValueError:
+                        pass
+                return updater
+
+            entry.bind("<KeyRelease>", make_law_updater(key, val_type, unit, entry))
 
     def _update_law_proportion(self, p_idx, l_idx, prop_idx, val_str):
         try:
