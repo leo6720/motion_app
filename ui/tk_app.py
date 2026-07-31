@@ -4,6 +4,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import numpy as np
+import ctypes
+import os
 
 import matplotlib
 matplotlib.use("TkAgg")
@@ -24,162 +26,88 @@ class MotionApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Progettazione Camme - Marchesini Group S.p.A.")
+        # Fix taskbar icon on Windows
+        if os.name == 'nt':
+            myappid = 'marchesini.motionapp.1.0'
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+
+        self.title("Progettazione Camme")
         try:
             self.iconbitmap("Motion_app_logo.ico")
         except Exception:
             pass
         self.geometry("1400x900")
 
-        # Data structure:
-        # project = { 'title': 'Nuovo Progetto', 'profiles': [...], 'markers': [...] }
-        self.project = {
-            "title": "Nuovo Progetto",
-            "profiles": [
-                {
-                    "name": "Nuovo Profilo",
-                    "visible": True,
-                    "points_per_cycle": 1440,
-                    "start_pos": 600.0,
-                    "start_phase": 0.0,
-                    "cycle_mod": "No",
-                    "unit_x": "s",
-                    "cycle_vel": 3.33333333,
-                    "cycle_duration": 18.0,
-                    "unit_y": "mm",
-                    "laws": [
-                        {
-                            "type": "trap_gen",
-                            "name": "Trapezoidale generalizzata",
-                            "phase": 40.0,
-                            "duration": 2.0,
-                            "stroke": -60.0,
-                            "v_ini": 0.0,
-                            "a_ini": 0.0,
-                            "v_fin": 0.0,
-                            "a_fin": 0.0,
-                            "parz_ini": 0.0,
-                            "parz_fin": 0.25,
-                            "cv": 2.0,
-                            "ca": 4.888,
-                            "proportions": [10, 20, 10, 0, 10, 20, 10]
-                        },
-                        {
-                            "type": "dwell",
-                            "name": "Sosta",
-                            "phase": 10.0,
-                            "duration": 0.5,
-                            "stroke": 0.0,
-                            "v_ini": 0.0,
-                            "a_ini": 0.0,
-                            "v_fin": 0.0,
-                            "a_fin": 0.0,
-                            "parz_ini": 0.0,
-                            "parz_fin": 0.0,
-                            "cv": "NaN",
-                            "ca": "NaN"
-                        },
-                        {
-                            "type": "trap_gen",
-                            "name": "Trapezoidale generalizzata",
-                            "phase": 125.0,
-                            "duration": 6.25,
-                            "stroke": -600.0,
-                            "v_ini": 0.0,
-                            "a_ini": 0.0,
-                            "v_fin": 0.0,
-                            "a_fin": 0.0,
-                            "parz_ini": 0.0,
-                            "parz_fin": 0.013,
-                            "cv": 2.0,
-                            "ca": 4.888,
-                            "proportions": [10, 20, 10, 0, 10, 20, 10]
-                        },
-                        {
-                            "type": "dwell",
-                            "name": "Sosta",
-                            "phase": 10.0,
-                            "duration": 0.5,
-                            "stroke": 0.0,
-                            "v_ini": 0.0,
-                            "a_ini": 0.0,
-                            "v_fin": 0.0,
-                            "a_fin": 0.0,
-                            "parz_ini": 0.0,
-                            "parz_fin": 0.0,
-                            "cv": "NaN",
-                            "ca": "NaN"
-                        }
-                    ]
-                }
-            ],
-            "markers": [
-                {"value": 6.25, "visible": True, "label": "x = 6.25°"}
-            ]
-        }
-
+        self.project = None
         self.node_map = {}
 
-        self._build_menu()
-        self._build_ui()
-        self._populate_tree()
-        self.calculate()
+        self.main_container = ttk.Frame(self)
+        self.main_container.pack(fill=tk.BOTH, expand=True)
+
+        self._show_homepage()
 
     # ============================
-    # MENU BAR
+    # HOMEPAGE & NAVIGATION
     # ============================
-    def _build_menu(self):
+    def _show_homepage(self):
+        for widget in self.main_container.winfo_children():
+            widget.destroy()
+
+        self.project = None
+        self._build_menu(full=False)
+
+        frame = ttk.Frame(self.main_container)
+        frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+
+        ttk.Button(frame, text="Nuovo Progetto", width=25, command=self.new_project).pack(pady=10)
+        ttk.Button(frame, text="Apri...", width=25, command=lambda: None).pack(pady=10)
+
+    def _build_menu(self, full=True):
         menubar = tk.Menu(self)
 
-        # File menu
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="Nuovo Progetto", command=self.new_project)
         file_menu.add_command(label="Apri...", command=lambda: None)
-        file_menu.add_command(label="Salva", command=lambda: None)
-        file_menu.add_command(label="Salva con nome...", command=lambda: None)
+        if full:
+            file_menu.add_command(label="Salva", command=lambda: None)
+            file_menu.add_command(label="Salva con nome...", command=lambda: None)
         file_menu.add_separator()
         file_menu.add_command(label="Esci", command=self.destroy)
         menubar.add_cascade(label="File", menu=file_menu)
 
-        menubar.add_cascade(label="Modifica", menu=tk.Menu(menubar, tearoff=0))
+        if full:
+            menubar.add_cascade(label="Modifica", menu=tk.Menu(menubar, tearoff=0))
 
-        # Profili di moto menu
-        prof_menu = tk.Menu(menubar, tearoff=0)
-        prof_menu.add_command(label="Nuovo profilo", command=self.add_profile)
-        prof_menu.add_command(label="Elimina profilo", command=self.remove_profile)
-        menubar.add_cascade(label="Profili di moto", menu=prof_menu)
+            prof_menu = tk.Menu(menubar, tearoff=0)
+            prof_menu.add_command(label="Nuovo profilo", command=self.add_profile)
+            prof_menu.add_command(label="Elimina profilo", command=self.remove_profile)
+            menubar.add_cascade(label="Profili di moto", menu=prof_menu)
 
-        # Leggi di moto menu
-        laws_menu = tk.Menu(menubar, tearoff=0)
-        new_law_menu = tk.Menu(laws_menu, tearoff=0)
-        new_law_menu.add_command(label="Trapezoidale", command=lambda: self.add_law("trapezoidal", "Trapezoidale"))
-        new_law_menu.add_command(label="Trapezoidale generalizzata", command=lambda: self.add_law("trap_gen", "Trapezoidale generalizzata"))
-        new_law_menu.add_command(label="Sosta", command=lambda: self.add_law("dwell", "Sosta"))
-        new_law_menu.add_command(label="Cicloidale", command=lambda: self.add_law("cycloidal", "Cicloidale"))
-        new_law_menu.add_command(label="Polinomiale 3-4-5", command=lambda: self.add_law("poly_345", "Polinomiale 3-4-5"))
+            laws_menu = tk.Menu(menubar, tearoff=0)
+            new_law_menu = tk.Menu(laws_menu, tearoff=0)
+            new_law_menu.add_command(label="Trapezoidale", command=lambda: self.add_law("trapezoidal", "Trapezoidale"))
+            new_law_menu.add_command(label="Trapezoidale generalizzata", command=lambda: self.add_law("trap_gen", "Trapezoidale generalizzata"))
+            new_law_menu.add_command(label="Sosta", command=lambda: self.add_law("dwell", "Sosta"))
+            new_law_menu.add_command(label="Cicloidale", command=lambda: self.add_law("cycloidal", "Cicloidale"))
+            new_law_menu.add_command(label="Polinomiale 3-4-5", command=lambda: self.add_law("poly_345", "Polinomiale 3-4-5"))
+            laws_menu.add_cascade(label="Nuova legge di moto", menu=new_law_menu)
+            laws_menu.add_command(label="Elimina legge", command=self.remove_law)
+            menubar.add_cascade(label="Leggi di moto", menu=laws_menu)
 
-        laws_menu.add_cascade(label="Nuova legge di moto", menu=new_law_menu)
-        laws_menu.add_command(label="Elimina legge", command=self.remove_law)
-        menubar.add_cascade(label="Leggi di moto", menu=laws_menu)
+            tools_menu = tk.Menu(menubar, tearoff=0)
+            tools_menu.add_command(label="Nuovo marker", command=self.add_marker)
+            export_menu = tk.Menu(tools_menu, tearoff=0)
+            export_menu.add_command(label="Spostamento", command=lambda: export_to_ibl(self.project, "displacement"))
+            export_menu.add_command(label="Velocità", command=lambda: export_to_ibl(self.project, "speed"))
+            export_menu.add_command(label="Accelerazione", command=lambda: export_to_ibl(self.project, "acceleration"))
+            export_menu.add_command(label="Jerk", command=lambda: export_to_ibl(self.project, "jerk"))
+            tools_menu.add_cascade(label="Esporta IBL", menu=export_menu)
+            tools_menu.add_command(label="Esporta CSV", command=lambda: export_all_data(self.project, "csv"))
+            tools_menu.add_command(label="Esporta TXT", command=lambda: export_all_data(self.project, "txt"))
+            menubar.add_cascade(label="Strumenti", menu=tools_menu)
 
-        # Strumenti menu
-        tools_menu = tk.Menu(menubar, tearoff=0)
-        tools_menu.add_command(label="Nuovo marker", command=self.add_marker)
-
-        export_menu = tk.Menu(tools_menu, tearoff=0)
-        export_menu.add_command(label="Spostamento", command=lambda: export_to_ibl(self.project, "displacement"))
-        export_menu.add_command(label="Velocità", command=lambda: export_to_ibl(self.project, "speed"))
-        export_menu.add_command(label="Accelerazione", command=lambda: export_to_ibl(self.project, "acceleration"))
-        export_menu.add_command(label="Jerk", command=lambda: export_to_ibl(self.project, "jerk"))
-        tools_menu.add_cascade(label="Esporta IBL", menu=export_menu)
-        
-        tools_menu.add_command(label="Esporta CSV", command=lambda: export_all_data(self.project, "csv"))
-        tools_menu.add_command(label="Esporta TXT", command=lambda: export_all_data(self.project, "txt"))
-
-        menubar.add_cascade(label="Strumenti", menu=tools_menu)
-
-        menubar.add_cascade(label="Parametrizzazione", menu=tk.Menu(menubar, tearoff=0))
-        menubar.add_cascade(label="Opzioni", menu=tk.Menu(menubar, tearoff=0))
+            menubar.add_cascade(label="Parametrizzazione", menu=tk.Menu(menubar, tearoff=0))
+            menubar.add_cascade(label="Opzioni", menu=tk.Menu(menubar, tearoff=0))
 
         self.config(menu=menubar)
 
@@ -187,15 +115,18 @@ class MotionApp(tk.Tk):
     # UI LAYOUT
     # ============================
     def _build_ui(self):
-        v_paned = ttk.PanedWindow(self, orient=tk.VERTICAL)
+        for widget in self.main_container.winfo_children():
+            widget.destroy()
+
+        v_paned = ttk.PanedWindow(self.main_container, orient=tk.VERTICAL)
         v_paned.pack(fill=tk.BOTH, expand=True)
 
         top_paned = ttk.PanedWindow(v_paned, orient=tk.HORIZONTAL)
-        v_paned.add(top_paned, weight=2)
+        v_paned.add(top_paned, weight=5)
 
         # ================= LEFT SIDEBAR =================
         left_frame = ttk.Frame(top_paned, width=400, padding=4)
-        top_paned.add(left_frame, weight=1)
+        top_paned.add(left_frame, weight=0)
 
         # 1. Project Hierarchy Tree
         tree_frame = ttk.Frame(left_frame)
@@ -223,7 +154,7 @@ class MotionApp(tk.Tk):
 
         # ================= RIGHT PLOTS (2x2 Grid) =================
         right_frame = ttk.Frame(top_paned, padding=2)
-        top_paned.add(right_frame, weight=3)
+        top_paned.add(right_frame, weight=1)
 
         self.fig = Figure(figsize=(8, 6))
         self.axes = self.fig.subplots(2, 2)
@@ -311,6 +242,16 @@ class MotionApp(tk.Tk):
             m_node = self.project_tree.insert(m_root, "end", text=m_text)
             self.node_map[m_node] = ("marker", m_idx)
 
+    def _toggle_profile_visibility(self, p_idx):
+        self.project["profiles"][p_idx]["visible"] = not self.project["profiles"][p_idx]["visible"]
+        self._populate_tree()
+        self.calculate()
+
+    def _toggle_marker_visibility(self, m_idx):
+        self.project["markers"][m_idx]["visible"] = not self.project["markers"][m_idx]["visible"]
+        self._populate_tree()
+        self.calculate()
+
     def _on_tree_select(self, event):
         selected = self.project_tree.selection()
         if not selected:
@@ -342,11 +283,17 @@ class MotionApp(tk.Tk):
 
         menu = tk.Menu(self, tearoff=0)
         if node_type == "profile":
+            label = "Nascondi Profilo" if self.project["profiles"][data]["visible"] else "Mostra Profilo"
+            menu.add_command(label=label, command=lambda: self._toggle_profile_visibility(data))
+            menu.add_separator()
             menu.add_command(label="Elimina Profilo", command=lambda: self._delete_profile_by_idx(data))
         elif node_type == "law":
             p_idx, l_idx = data
             menu.add_command(label="Elimina Legge", command=lambda: self._delete_law_by_idx(p_idx, l_idx))
         elif node_type == "marker":
+            label = "Nascondi Marker" if self.project["markers"][data]["visible"] else "Mostra Marker"
+            menu.add_command(label=label, command=lambda: self._toggle_marker_visibility(data))
+            menu.add_separator()
             menu.add_command(label="Elimina Marker", command=lambda: self._delete_marker_by_idx(data))
         else:
             return
@@ -583,14 +530,15 @@ class MotionApp(tk.Tk):
             raw_val = law.get(key, "")
             entry.insert(0, str(raw_val))
             entry.grid(row=i, column=1, sticky="e", pady=2)
-            clean_unit = unit.strip()
-            if clean_unit:
-                ttk.Label(tab_gen, text=clean_unit).grid(row=i, column=2, sticky="w", padx=2, pady=2)
-
+            
             if unit_x == "s" and key == "phase":
                 entry.config(state="disabled")
             elif unit_x == "°" and key == "duration":
                 entry.config(state="disabled")
+
+            clean_unit = unit.strip()
+            if clean_unit:
+                ttk.Label(tab_gen, text=clean_unit).grid(row=i, column=2, sticky="w", padx=2, pady=2)
 
             def make_law_updater(k, t, ent):
                 def updater(event):
@@ -658,13 +606,81 @@ class MotionApp(tk.Tk):
     # PROJECT & MENU ACTIONS
     # ============================
     def new_project(self):
-        self.project = {
-            "title": "Nuovo Progetto",
-            "profiles": [],
-            "markers": []
-        }
-        self._populate_tree()
-        self.calculate()
+        dialog = tk.Toplevel(self)
+        dialog.title("Nuovo Progetto")
+        dialog.geometry("300x150")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Nome Progetto:").pack(pady=(10, 0))
+        e_name = ttk.Entry(dialog)
+        e_name.insert(0, "Nuovo Progetto")
+        e_name.pack(pady=5, padx=10, fill=tk.X)
+
+        show_example = tk.BooleanVar(value=False)
+        ttk.Checkbutton(dialog, text="mostra leggi di moto di esempio", variable=show_example).pack(pady=5)
+
+        def on_ok():
+            name = e_name.get()
+            if not name:
+                messagebox.showerror("Errore", "Inserisci un nome per il progetto")
+                return
+
+            if show_example.get():
+                self.project = {
+                    "title": name,
+                    "profiles": [
+                        {
+                            "name": "Nuovo Profilo",
+                            "visible": True,
+                            "points_per_cycle": 1440,
+                            "start_pos": 600.0,
+                            "start_phase": 0.0,
+                            "cycle_mod": "No",
+                            "unit_x": "s",
+                            "cycle_vel": 3.33333333,
+                            "cycle_duration": 18.0,
+                            "unit_y": "mm",
+                            "laws": [
+                                {
+                                    "type": "trap_gen",
+                                    "name": "Trapezoidale generalizzata",
+                                    "phase": 40.0,
+                                    "duration": 2.0,
+                                    "stroke": -60.0,
+                                    "v_ini": 0.0, "a_ini": 0.0, "v_fin": 0.0, "a_fin": 0.0,
+                                    "parz_ini": 0.0, "parz_fin": 0.25,
+                                    "cv": 2.0, "ca": 4.888,
+                                    "proportions": [10, 20, 10, 0, 10, 20, 10]
+                                },
+                                {
+                                    "type": "dwell",
+                                    "name": "Sosta",
+                                    "phase": 10.0, "duration": 0.5, "stroke": 0.0,
+                                    "v_ini": 0.0, "a_ini": 0.0, "v_fin": 0.0, "a_fin": 0.0,
+                                    "parz_ini": 0.0, "parz_fin": 0.0,
+                                    "cv": "NaN", "ca": "NaN"
+                                }
+                            ]
+                        }
+                    ],
+                    "markers": [{"value": 6.25, "visible": True, "label": "x = 6.25°"}]
+                }
+            else:
+                self.project = {
+                    "title": name,
+                    "profiles": [],
+                    "markers": []
+                }
+
+            dialog.destroy()
+            self.title(f"Progettazione Camme - {name}")
+            self._build_menu(full=True)
+            self._build_ui()
+            self._populate_tree()
+            self.calculate()
+
+        ttk.Button(dialog, text="OK", command=on_ok).pack(pady=10)
 
     def add_profile(self):
         new_p = {
