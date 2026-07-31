@@ -57,6 +57,10 @@ def _trapezoidal(tau, params=None):
         v[i] = v[i-1] + a[i-1] * dt
         x[i] = x[i-1] + v[i-1] * dt
 
+    v[-1] = 0.0
+    a[-1] = 0.0
+    a[0] = 0.0
+
     if x[-1] != 0:
         x = x / x[-1]
     vmax = np.max(np.abs(v))
@@ -135,6 +139,10 @@ def _trapezoidal_generalized(tau, params=None):
         a[idx] = a[idx-1] + j[idx-1] * dt
         v[idx] = v[idx-1] + a[idx-1] * dt
         x[idx] = x[idx-1] + v[idx-1] * dt
+
+    v[-1] = 0.0
+    a[-1] = 0.0
+    a[0] = 0.0
 
     if x[-1] != 0:
         x = x / x[-1]
