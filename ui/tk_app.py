@@ -344,7 +344,8 @@ class MotionApp(tk.Tk):
     def _show_law_editor(self, p_idx, l_idx):
         self._clear_editor()
         self.editor_container.config(text="Editor Legge")
-        law = self.project["profiles"][p_idx]["laws"][l_idx]
+        profile = self.project["profiles"][p_idx]
+        law = profile["laws"][l_idx]
 
         nb = ttk.Notebook(self.editor_container)
         nb.pack(fill=tk.BOTH, expand=True)
@@ -354,20 +355,29 @@ class MotionApp(tk.Tk):
         nb.add(ttk.Frame(nb), text="Input specifici")
         nb.add(ttk.Frame(nb), text="Output")
 
-        fields = [
-            ("Fase", f"{law['phase']} °"),
-            ("Durata", f"{law['duration']} s"),
-            ("Salto", f"{law['stroke']} mm"),
-            ("Velocità iniziale", f"{law['v_ini']} mm/s"),
-            ("Accelerazione iniziale", f"{law['a_ini']} mm/s²"),
-            ("Velocità finale", f"{law['v_fin']} mm/s"),
-            ("Accelerazione finale", f"{law['a_fin']} mm/s²"),
-            ("Continuita da sx", "No"),
-            ("Continuita da dx", "No"),
-            ("Parz. iniziale", f"{law['parz_ini']} s"),
-            ("Parz. finale", f"{law['parz_fin']} s"),
-            ("Unità (asse x)", "s"),
-        ]
+        if law["type"] == "dwell":
+            fields = [
+                ("Fase", f"{law['phase']} °"),
+                ("Durata", f"{law['duration']} s"),
+                ("Unità (asse x)", "s"),
+                ("Velocità ciclo", f"{profile['cycle_vel']} rpm"),
+                ("Durata ciclo", f"{profile['cycle_duration']} s"),
+            ]
+        else:
+            fields = [
+                ("Fase", f"{law['phase']} °"),
+                ("Durata", f"{law['duration']} s"),
+                ("Salto", f"{law['stroke']} mm"),
+                ("Velocità iniziale", f"{law['v_ini']} mm/s"),
+                ("Accelerazione iniziale", f"{law['a_ini']} mm/s²"),
+                ("Velocità finale", f"{law['v_fin']} mm/s"),
+                ("Accelerazione finale", f"{law['a_fin']} mm/s²"),
+                ("Continuita da sx", "No"),
+                ("Continuita da dx", "No"),
+                ("Parz. iniziale", f"{law['parz_ini']} s"),
+                ("Parz. finale", f"{law['parz_fin']} s"),
+                ("Unità (asse x)", "s"),
+            ]
 
         for i, (label_text, val) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
