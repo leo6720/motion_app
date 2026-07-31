@@ -1,6 +1,6 @@
 #
 #i now need to edit the behaviour of th fase and durata text boxes in the leggi. in editor profilo unità asse x needs to be a drop down menu where you select between ° and s. based on the selection durata ciclo should change unit of measue and its value should be the length of the x axis of the plots. based on that same selection in the editor legge one between fase and durata shoul gray out. is s is selected then fase should be greyed out and if ° is selected then durata shoul be grayed out. the one not greyed out is the one dictating the duration of that legge on the x axis. 
-
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import numpy as np
@@ -20,6 +20,14 @@ from motion.ibl_export import export_to_ibl, export_all_data
 from ui.segment_editor import SegmentEditor
 from ui.motion_list import MotionList
 
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, relative_path)
+
 
 class MotionApp(tk.Tk):
 
@@ -33,7 +41,7 @@ class MotionApp(tk.Tk):
 
         self.title("Progettazione Camme")
         try:
-            self.iconbitmap("Motion_app_logo.ico")
+            self.iconbitmap(resource_path("stick_optimizer_logo.ico"))
         except Exception:
             pass
         self.geometry("1400x900")
