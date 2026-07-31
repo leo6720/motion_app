@@ -180,7 +180,7 @@ class MotionApp(tk.Tk):
         v_paned.add(top_paned, weight=4)
 
         # ================= LEFT SIDEBAR =================
-        left_frame = ttk.Frame(top_paned, width=320, padding=2)
+        left_frame = ttk.Frame(top_paned, width=448, padding=2)
         top_paned.add(left_frame, weight=0)
 
         # 1. Project Hierarchy Tree
