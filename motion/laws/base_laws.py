@@ -79,19 +79,23 @@ def _trapezoidal_generalized(tau, params=None):
     b = np.concatenate(([0.0], np.cumsum(profile)))
 
     # =========================
-    # JERK (Rectangular Pulses / Steps)
+    # JERK (Smooth / Rounded as in immagine (3))
     # =========================
-    # Usiamo un pattern di jerk a blocchi costanti (gradini netti) per ogni intervallo
-    jerk_pattern = np.array([1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0], dtype=float)
-
     j = np.zeros_like(tau)
+    target_jerk = np.array([1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0], dtype=float)
 
     for i in range(7):
-        if i == 6:
-            mask = (tau >= b[i]) & (tau <= b[i+1])
+        mask = (tau >= b[i]) & (tau <= b[i+1])
+        if b[i+1] > b[i]:
+            local_tau = (tau[mask] - b[i]) / (b[i+1] - b[i])
+            start_j = target_jerk[i-1] if i > 0 else 0.0
+            end_j = target_jerk[i]
+            # Smooth sine-based transition for bell-shaped jerk lobes
+            j[mask] = start_j + (end_j - start_j) * (0.5 - 0.5 * np.cos(np.pi * local_tau))
         else:
-            mask = (tau >= b[i]) & (tau < b[i+1])
-        j[mask] = jerk_pattern[i]
+            j[mask] = target_jerk[i]
+
+    j[tau == 1.0] = 0.0
 
     # =========================
     # INTEGRAZIONE
