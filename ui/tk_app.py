@@ -435,6 +435,12 @@ class MotionApp(tk.Tk):
             ("Unità (asse y)", "unit_y", str, ""),
         ]
 
+        # Compute total duration from laws based on unit_x
+        unit_x = profile.get("unit_x", "s")
+        total_dur = sum(l.get("duration" if unit_x == "s" else "phase", 0.0) for l in profile.get("laws", []))
+        if total_dur > 0:
+            profile["cycle_duration"] = total_dur
+
         for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
             if key == "unit_x":
@@ -447,10 +453,8 @@ class MotionApp(tk.Tk):
                     def on_combobox_selected(event):
                         val = w.get()
                         p["unit_x"] = val
-                        if val == "°":
-                            p["cycle_duration"] = 360.0
-                        else:
-                            p["cycle_duration"] = 18.0
+                        # Recalculate cycle_duration based on the new unit_x and laws
+                        p["cycle_duration"] = sum(l.get("duration" if val == "s" else "phase", 0.0) for l in p.get("laws", []))
                         self._show_profile_editor(p_idx)
                         self.calculate()
                     return on_combobox_selected
