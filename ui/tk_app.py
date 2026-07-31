@@ -186,6 +186,17 @@ class MotionApp(tk.Tk):
         self.project_tree.pack(fill=tk.BOTH, expand=True)
         self.project_tree.bind("<<TreeviewSelect>>", self._on_tree_select)
         self.project_tree.bind("<Double-1>", self._on_tree_double_click)
+        
+        # Right-click context menu
+        self.project_tree.bind("<Button-3>", self._on_tree_right_click)
+        # For macOS compatibility
+        self.project_tree.bind("<Button-2>", self._on_tree_right_click)
+
+        # Drag and drop bindings
+        self.project_tree.bind("<ButtonPress-1>", self._on_drag_start)
+        self.project_tree.bind("<B1-Motion>", self._on_drag_motion)
+        self.project_tree.bind("<ButtonRelease-1>", self._on_drag_release)
+        self._drag_node = None
 
         # 2. Contextual Editor Frame
         self.editor_container = ttk.LabelFrame(left_frame, text="Editor Profilo", padding=5)
@@ -287,6 +298,92 @@ class MotionApp(tk.Tk):
             self._show_marker_editor(m_idx)
 
         self.calculate()
+
+    def _on_tree_right_click(self, event):
+        iid = self.project_tree.identify_row(event.y)
+        if not iid:
+            return
+        self.project_tree.selection_set(iid)
+        node_type, data = self.node_map.get(iid, (None, None))
+
+        menu = tk.Menu(self, tearoff=0)
+        if node_type == "profile":
+            menu.add_command(label="Elimina Profilo", command=lambda: self._delete_profile_by_idx(data))
+        elif node_type == "law":
+            p_idx, l_idx = data
+            menu.add_command(label="Elimina Legge", command=lambda: self._delete_law_by_idx(p_idx, l_idx))
+        elif node_type == "marker":
+            menu.add_command(label="Elimina Marker", command=lambda: self._delete_marker_by_idx(data))
+        else:
+            return
+
+        menu.post(event.x_root, event.y_root)
+
+    def _delete_profile_by_idx(self, p_idx):
+        if messagebox.askyesno("Conferma", "Vuoi davvero eliminare questo profilo?"):
+            del self.project["profiles"][p_idx]
+            self._populate_tree()
+            self.calculate()
+
+    def _delete_law_by_idx(self, p_idx, l_idx):
+        if messagebox.askyesno("Conferma", "Vuoi davvero eliminare questa legge?"):
+            del self.project["profiles"][p_idx]["laws"][l_idx]
+            self._populate_tree()
+            self.calculate()
+
+    def _delete_marker_by_idx(self, m_idx):
+        if messagebox.askyesno("Conferma", "Vuoi davvero eliminare questo marker?"):
+            del self.project["markers"][m_idx]
+            self._populate_tree()
+            self.calculate()
+
+    def _on_drag_start(self, event):
+        iid = self.project_tree.identify_row(event.y)
+        if iid:
+            node_type, data = self.node_map.get(iid, (None, None))
+            if node_type in ("profile", "law", "marker"):
+                self._drag_node = iid
+
+    def _on_drag_motion(self, event):
+        pass
+
+    def _on_drag_release(self, event):
+        if not self._drag_node:
+            return
+        
+        target_iid = self.project_tree.identify_row(event.y)
+        if not target_iid or target_iid == self._drag_node:
+            self._drag_node = None
+            return
+
+        src_type, src_data = self.node_map.get(self._drag_node, (None, None))
+        tgt_type, tgt_data = self.node_map.get(target_iid, (None, None))
+
+        if src_type == "profile" and tgt_type == "profile":
+            # Reorder profiles
+            profiles = self.project["profiles"]
+            val = profiles.pop(src_data)
+            profiles.insert(tgt_data, val)
+            self._populate_tree()
+            self.calculate()
+        elif src_type == "law" and tgt_type == "law":
+            src_p, src_l = src_data
+            tgt_p, tgt_l = tgt_data
+            if src_p == tgt_p: # Only allow reordering within the same profile
+                laws = self.project["profiles"][src_p]["laws"]
+                val = laws.pop(src_l)
+                laws.insert(tgt_l, val)
+                self._populate_tree()
+                self.calculate()
+        elif src_type == "marker" and tgt_type == "marker":
+            # Reorder markers
+            markers = self.project["markers"]
+            val = markers.pop(src_data)
+            markers.insert(tgt_data, val)
+            self._populate_tree()
+            self.calculate()
+
+        self._drag_node = None
 
     def _on_tree_double_click(self, event):
         selected = self.project_tree.selection()
