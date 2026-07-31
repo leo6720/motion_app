@@ -209,7 +209,7 @@ class MotionApp(tk.Tk):
 
         # ================= RIGHT PLOTS (2x2 Grid) =================
         right_frame = ttk.Frame(top_paned, padding=2)
-        top_paned.add(right_frame, weight=1)
+        top_paned.add(right_frame, weight=3)
 
         self.fig = Figure(figsize=(8, 6))
         self.axes = self.fig.subplots(2, 2)
