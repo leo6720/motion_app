@@ -19,18 +19,104 @@ class MotionApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.motion_sets = []
-        self.current = None
-
-        self.title("Progettazione Camme - Simulatore Leggi di Moto")
+        self.title("Progettazione Camme - Marchesini Group S.p.A.")
         try:
             self.iconbitmap("Motion_app_logo.ico")
         except Exception:
             pass
         self.geometry("1400x900")
 
+        # Data structure:
+        # project = { 'title': 'Nuovo Progetto', 'profiles': [...], 'markers': [...] }
+        self.project = {
+            "title": "Nuovo Progetto",
+            "profiles": [
+                {
+                    "name": "Nuovo Profilo",
+                    "visible": True,
+                    "points_per_cycle": 1440,
+                    "start_pos": 600.0,
+                    "start_phase": 0.0,
+                    "cycle_mod": "No",
+                    "unit_x": "s",
+                    "cycle_vel": 3.33333333,
+                    "cycle_duration": 18.0,
+                    "unit_y": "mm",
+                    "laws": [
+                        {
+                            "type": "trap_gen",
+                            "name": "Trapezoidale generalizzata",
+                            "phase": 40.0,
+                            "duration": 2.0,
+                            "stroke": -60.0,
+                            "v_ini": 0.0,
+                            "a_ini": 0.0,
+                            "v_fin": 0.0,
+                            "a_fin": 0.0,
+                            "parz_ini": 0.0,
+                            "parz_fin": 0.25,
+                            "cv": 2.0,
+                            "ca": 4.888
+                        },
+                        {
+                            "type": "dwell",
+                            "name": "Sosta",
+                            "phase": 10.0,
+                            "duration": 0.5,
+                            "stroke": 0.0,
+                            "v_ini": 0.0,
+                            "a_ini": 0.0,
+                            "v_fin": 0.0,
+                            "a_fin": 0.0,
+                            "parz_ini": 0.0,
+                            "parz_fin": 0.0,
+                            "cv": "NaN",
+                            "ca": "NaN"
+                        },
+                        {
+                            "type": "trap_gen",
+                            "name": "Trapezoidale generalizzata",
+                            "phase": 125.0,
+                            "duration": 6.25,
+                            "stroke": -600.0,
+                            "v_ini": 0.0,
+                            "a_ini": 0.0,
+                            "v_fin": 0.0,
+                            "a_fin": 0.0,
+                            "parz_ini": 0.0,
+                            "parz_fin": 0.013,
+                            "cv": 2.0,
+                            "ca": 4.888
+                        },
+                        {
+                            "type": "dwell",
+                            "name": "Sosta",
+                            "phase": 10.0,
+                            "duration": 0.5,
+                            "stroke": 0.0,
+                            "v_ini": 0.0,
+                            "a_ini": 0.0,
+                            "v_fin": 0.0,
+                            "a_fin": 0.0,
+                            "parz_ini": 0.0,
+                            "parz_fin": 0.0,
+                            "cv": "NaN",
+                            "ca": "NaN"
+                        }
+                    ]
+                }
+            ],
+            "markers": [
+                {"value": 6.25, "visible": True, "label": "x = 6.25°"}
+            ]
+        }
+
+        self.node_map = {}
+
         self._build_menu()
         self._build_ui()
+        self._populate_tree()
+        self.calculate()
 
     # ============================
     # MENU BAR
@@ -38,11 +124,41 @@ class MotionApp(tk.Tk):
     def _build_menu(self):
         menubar = tk.Menu(self)
 
-        menubar.add_cascade(label="File", menu=tk.Menu(menubar, tearoff=0))
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Nuovo Progetto", command=self.new_project)
+        file_menu.add_command(label="Apri...", command=lambda: None)
+        file_menu.add_command(label="Salva", command=lambda: None)
+        file_menu.add_command(label="Salva con nome...", command=lambda: None)
+        file_menu.add_separator()
+        file_menu.add_command(label="Esci", command=self.destroy)
+        menubar.add_cascade(label="File", menu=file_menu)
+
         menubar.add_cascade(label="Modifica", menu=tk.Menu(menubar, tearoff=0))
-        menubar.add_cascade(label="Profili di moto", menu=tk.Menu(menubar, tearoff=0))
-        menubar.add_cascade(label="Leggi di moto", menu=tk.Menu(menubar, tearoff=0))
-        menubar.add_cascade(label="Strumenti", menu=tk.Menu(menubar, tearoff=0))
+
+        # Profili di moto menu
+        prof_menu = tk.Menu(menubar, tearoff=0)
+        prof_menu.add_command(label="Nuovo profilo", command=self.add_profile)
+        prof_menu.add_command(label="Elimina profilo", command=self.remove_profile)
+        menubar.add_cascade(label="Profili di moto", menu=prof_menu)
+
+        # Leggi di moto menu
+        laws_menu = tk.Menu(menubar, tearoff=0)
+        new_law_menu = tk.Menu(laws_menu, tearoff=0)
+        new_law_menu.add_command(label="Trapezoidale generalizzata", command=lambda: self.add_law("trap_gen", "Trapezoidale generalizzata"))
+        new_law_menu.add_command(label="Sosta", command=lambda: self.add_law("dwell", "Sosta"))
+        new_law_menu.add_command(label="Cicloidale", command=lambda: self.add_law("cycloidal", "Cicloidale"))
+        new_law_menu.add_command(label="Polinomiale 3-4-5", command=lambda: self.add_law("poly_345", "Polinomiale 3-4-5"))
+
+        laws_menu.add_cascade(label="Nuova legge di moto", menu=new_law_menu)
+        laws_menu.add_command(label="Elimina legge", command=self.remove_law)
+        menubar.add_cascade(label="Leggi di moto", menu=laws_menu)
+
+        # Strumenti menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        tools_menu.add_command(label="Nuovo marker", command=self.add_marker)
+        menubar.add_cascade(label="Strumenti", menu=tools_menu)
+
         menubar.add_cascade(label="Parametrizzazione", menu=tk.Menu(menubar, tearoff=0))
         menubar.add_cascade(label="Opzioni", menu=tk.Menu(menubar, tearoff=0))
 
@@ -52,7 +168,6 @@ class MotionApp(tk.Tk):
     # UI LAYOUT
     # ============================
     def _build_ui(self):
-        # Vertical split: Top (Tree + Plots) / Bottom (Table)
         v_paned = ttk.PanedWindow(self, orient=tk.VERTICAL)
         v_paned.pack(fill=tk.BOTH, expand=True)
 
@@ -69,39 +184,19 @@ class MotionApp(tk.Tk):
 
         self.project_tree = ttk.Treeview(tree_frame, show="tree")
         self.project_tree.pack(fill=tk.BOTH, expand=True)
-
-        root_node = self.project_tree.insert("", "end", text="Nuovo Progetto", open=True)
-        self.profile_node = self.project_tree.insert(root_node, "end", text="☑ Nuovo Profilo", open=True)
-        
-        # Sample items under profile
-        self.project_tree.insert(self.profile_node, "end", text="Trapezoidale generalizzata")
-        self.project_tree.insert(self.profile_node, "end", text="Sosta")
-        self.project_tree.insert(self.profile_node, "end", text="Trapezoidale generalizzata")
-        self.project_tree.insert(self.profile_node, "end", text="Sosta")
-
-        self.markers_node = self.project_tree.insert(root_node, "end", text="Markers", open=True)
-        self.project_tree.insert(self.markers_node, "end", text="☑ x = 6.25°")
-
         self.project_tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+        self.project_tree.bind("<Double-1>", self._on_tree_double_click)
 
         # 2. Contextual Editor Frame
-        self.editor_container = ttk.LabelFrame(left_frame, text="Editor Legge", padding=5)
+        self.editor_container = ttk.LabelFrame(left_frame, text="Editor Profilo", padding=5)
         self.editor_container.pack(fill=tk.BOTH, expand=True)
-
-        self._build_profile_editor()
 
         # ================= RIGHT PLOTS (2x2 Grid) =================
         right_frame = ttk.Frame(top_paned, padding=2)
         top_paned.add(right_frame, weight=1)
 
         self.fig = Figure(figsize=(8, 6))
-        # 2x2 layout for Spostamento, Velocità, Accelerazione, Jerk
-        self.axes = self.fig.subplots(2, 2, sharex=True)
-        self.ax_pos = self.axes[0, 0]
-        self.ax_vel = self.axes[0, 1]
-        self.ax_acc = self.axes[1, 0]
-        self.ax_jrk = self.axes[1, 1]
-
+        self.axes = self.fig.subplots(2, 2)
         self.canvas = FigureCanvasTkAgg(self.fig, master=right_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
@@ -112,7 +207,6 @@ class MotionApp(tk.Tk):
         self.bottom_notebook = ttk.Notebook(bottom_frame)
         self.bottom_notebook.pack(fill=tk.BOTH, expand=True)
 
-        # Tab 1: Dettaglio input
         tab_detail = ttk.Frame(self.bottom_notebook)
         self.bottom_notebook.add(tab_detail, text="Dettaglio input")
 
@@ -137,32 +231,142 @@ class MotionApp(tk.Tk):
         ]
         for col_id, col_name in headers:
             self.detail_table.heading(col_id, text=col_name)
-            self.detail_table.column(col_id, width=80, anchor="center")
+            self.detail_table.column(col_id, width=85, anchor="center")
 
-        # Tab 2: Max/min profilo
         tab_maxmin = ttk.Frame(self.bottom_notebook)
         self.bottom_notebook.add(tab_maxmin, text="Max/min profilo")
 
-    def _build_profile_editor(self):
-        for child in self.editor_container.winfo_children():
-            child.destroy()
+    # ============================
+    # TREE MANAGEMENT
+    # ============================
+    def _populate_tree(self):
+        self.project_tree.delete(*self.project_tree.get_children())
+        self.node_map.clear()
 
-        editor_nb = ttk.Notebook(self.editor_container)
-        editor_nb.pack(fill=tk.BOTH, expand=True)
+        # Root node
+        root_id = self.project_tree.insert("", "end", text=self.project["title"], open=True)
+        self.node_map[root_id] = ("project", None)
 
-        tab_gen = ttk.Frame(editor_nb, padding=5)
-        editor_nb.add(tab_gen, text="Input generici")
-        editor_nb.add(ttk.Frame(editor_nb), text="Input specifici")
-        editor_nb.add(ttk.Frame(editor_nb), text="Output")
+        # Profiles
+        for p_idx, profile in enumerate(self.project["profiles"]):
+            p_text = f"☑ {profile['name']}" if profile['visible'] else f"☐ {profile['name']}"
+            p_node = self.project_tree.insert(root_id, "end", text=p_text, open=True)
+            self.node_map[p_node] = ("profile", p_idx)
+
+            for l_idx, law in enumerate(profile["laws"]):
+                l_node = self.project_tree.insert(p_node, "end", text=law["name"])
+                self.node_map[l_node] = ("law", (p_idx, l_idx))
+
+        # Markers
+        m_root = self.project_tree.insert(root_id, "end", text="Markers", open=True)
+        self.node_map[m_root] = ("markers_group", None)
+
+        for m_idx, marker in enumerate(self.project["markers"]):
+            m_text = f"☑ {marker['label']}" if marker['visible'] else f"☐ {marker['label']}"
+            m_node = self.project_tree.insert(m_root, "end", text=m_text)
+            self.node_map[m_node] = ("marker", m_idx)
+
+    def _on_tree_select(self, event):
+        selected = self.project_tree.selection()
+        if not selected:
+            return
+        node_id = selected[0]
+        if node_id not in self.node_map:
+            return
+
+        node_type, data = self.node_map[node_id]
+
+        if node_type in ("project", "profile"):
+            p_idx = data if node_type == "profile" else 0
+            self._show_profile_editor(p_idx)
+        elif node_type == "law":
+            p_idx, l_idx = data
+            self._show_law_editor(p_idx, l_idx)
+        elif node_type == "marker":
+            m_idx = data
+            self._show_marker_editor(m_idx)
+
+        self.calculate()
+
+    def _on_tree_double_click(self, event):
+        selected = self.project_tree.selection()
+        if not selected:
+            return
+        node_id = selected[0]
+        node_type, data = self.node_map.get(node_id, (None, None))
+
+        if node_type == "profile":
+            p_idx = data
+            curr_name = self.project["profiles"][p_idx]["name"]
+            new_name = tk.simpledialog.askstring("Rinomina Profilo", "Inserisci nuovo nome:", initialvalue=curr_name)
+            if new_name:
+                self.project["profiles"][p_idx]["name"] = new_name
+                self._populate_tree()
+
+    # ============================
+    # EDITORS
+    # ============================
+    def _clear_editor(self):
+        for widget in self.editor_container.winfo_children():
+            widget.destroy()
+
+    def _show_profile_editor(self, p_idx):
+        self._clear_editor()
+        self.editor_container.config(text="Editor Profilo")
+        profile = self.project["profiles"][p_idx]
+
+        nb = ttk.Notebook(self.editor_container)
+        nb.pack(fill=tk.BOTH, expand=True)
+
+        tab_gen = ttk.Frame(nb, padding=5)
+        nb.add(tab_gen, text="Input generici")
+        nb.add(ttk.Frame(nb), text="Visualizzazione")
+        nb.add(ttk.Frame(nb), text="Avanzate")
 
         fields = [
-            ("Fase", "125.0 °"),
-            ("Durata", "6.25 s"),
-            ("Salto", "-600.0 mm"),
-            ("Velocità iniziale", "0.0 mm/s"),
-            ("Accelerazione iniziale", "0.0 mm/s²"),
-            ("Velocità finale", "0.0 mm/s"),
-            ("Accelerazione finale", "0.0 mm/s²"),
+            ("Nome", profile["name"]),
+            ("Punti per ciclo", str(profile["points_per_cycle"])),
+            ("Posizione iniziale", f"{profile['start_pos']} mm"),
+            ("Sfasamento iniziale", f"{profile['start_phase']} s"),
+            ("Modulo ciclo", profile["cycle_mod"]),
+            ("Unità (asse x)", profile["unit_x"]),
+            ("Velocità ciclo", f"{profile['cycle_vel']} rpm"),
+            ("Durata ciclo", f"{profile['cycle_duration']} s"),
+            ("Unità (asse y)", profile["unit_y"]),
+        ]
+
+        for i, (label_text, val) in enumerate(fields):
+            ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
+            entry = ttk.Entry(tab_gen, width=14)
+            entry.insert(0, val)
+            entry.grid(row=i, column=1, sticky="e", pady=2)
+
+    def _show_law_editor(self, p_idx, l_idx):
+        self._clear_editor()
+        self.editor_container.config(text="Editor Legge")
+        law = self.project["profiles"][p_idx]["laws"][l_idx]
+
+        nb = ttk.Notebook(self.editor_container)
+        nb.pack(fill=tk.BOTH, expand=True)
+
+        tab_gen = ttk.Frame(nb, padding=5)
+        nb.add(tab_gen, text="Input generici")
+        nb.add(ttk.Frame(nb), text="Input specifici")
+        nb.add(ttk.Frame(nb), text="Output")
+
+        fields = [
+            ("Fase", f"{law['phase']} °"),
+            ("Durata", f"{law['duration']} s"),
+            ("Salto", f"{law['stroke']} mm"),
+            ("Velocità iniziale", f"{law['v_ini']} mm/s"),
+            ("Accelerazione iniziale", f"{law['a_ini']} mm/s²"),
+            ("Velocità finale", f"{law['v_fin']} mm/s"),
+            ("Accelerazione finale", f"{law['a_fin']} mm/s²"),
+            ("Continuita da sx", "No"),
+            ("Continuita da dx", "No"),
+            ("Parz. iniziale", f"{law['parz_ini']} s"),
+            ("Parz. finale", f"{law['parz_fin']} s"),
+            ("Unità (asse x)", "s"),
         ]
 
         for i, (label_text, val) in enumerate(fields):
@@ -171,17 +375,185 @@ class MotionApp(tk.Tk):
             entry.insert(0, val)
             entry.grid(row=i, column=1, sticky="e", pady=2)
 
-    def _on_tree_select(self, event):
+    def _show_marker_editor(self, m_idx):
+        self._clear_editor()
+        self.editor_container.config(text="Editor Marker")
+        marker = self.project["markers"][m_idx]
+
+        frame = ttk.Frame(self.editor_container, padding=5)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text="x").grid(row=0, column=0, sticky="w", pady=5)
+        e_x = ttk.Entry(frame, width=10)
+        e_x.insert(0, f"{marker['value']}")
+        e_x.grid(row=0, column=1, sticky="w", pady=5)
+
+        ttk.Label(frame, text="Etichetta").grid(row=1, column=0, sticky="w", pady=5)
+        e_lbl = ttk.Entry(frame, width=15)
+        e_lbl.insert(0, marker["label"])
+        e_lbl.grid(row=1, column=1, sticky="w", pady=5)
+
+    # ============================
+    # PROJECT & MENU ACTIONS
+    # ============================
+    def new_project(self):
+        self.project = {
+            "title": "Nuovo Progetto",
+            "profiles": [],
+            "markers": []
+        }
+        self._populate_tree()
+        self.calculate()
+
+    def add_profile(self):
+        new_p = {
+            "name": f"Profilo {len(self.project['profiles'])+1}",
+            "visible": True,
+            "points_per_cycle": 1440,
+            "start_pos": 600.0,
+            "start_phase": 0.0,
+            "cycle_mod": "No",
+            "unit_x": "s",
+            "cycle_vel": 3.33333333,
+            "cycle_duration": 18.0,
+            "unit_y": "mm",
+            "laws": []
+        }
+        self.project["profiles"].append(new_p)
+        self._populate_tree()
+
+    def remove_profile(self):
         selected = self.project_tree.selection()
         if not selected:
             return
-        item_text = self.project_tree.item(selected[0], "text")
-        if "Profilo" in item_text:
-            self.editor_container.config(text="Editor Profilo")
-        elif "x =" in item_text or "Marker" in item_text:
-            self.editor_container.config(text="Editor Marker")
-        else:
-            self.editor_container.config(text="Editor Legge")
+        node_type, data = self.node_map.get(selected[0], (None, None))
+        if node_type == "profile":
+            del self.project["profiles"][data]
+            self._populate_tree()
+            self.calculate()
+
+    def add_law(self, law_type, law_name):
+        selected = self.project_tree.selection()
+        p_idx = 0
+        if selected:
+            node_type, data = self.node_map.get(selected[0], (None, None))
+            if node_type == "profile":
+                p_idx = data
+            elif node_type == "law":
+                p_idx = data[0]
+
+        if not self.project["profiles"]:
+            self.add_profile()
+            p_idx = 0
+
+        law = {
+            "type": law_type,
+            "name": law_name,
+            "phase": 40.0 if law_type != "dwell" else 10.0,
+            "duration": 2.0 if law_type != "dwell" else 0.5,
+            "stroke": -60.0 if law_type != "dwell" else 0.0,
+            "v_ini": 0.0,
+            "a_ini": 0.0,
+            "v_fin": 0.0,
+            "a_fin": 0.0,
+            "parz_ini": 0.0,
+            "parz_fin": 0.0,
+            "cv": 2.0 if law_type != "dwell" else "NaN",
+            "ca": 4.888 if law_type != "dwell" else "NaN"
+        }
+        self.project["profiles"][p_idx]["laws"].append(law)
+        self._populate_tree()
+        self.calculate()
+
+    def remove_law(self):
+        selected = self.project_tree.selection()
+        if not selected:
+            return
+        node_type, data = self.node_map.get(selected[0], (None, None))
+        if node_type == "law":
+            p_idx, l_idx = data
+            del self.project["profiles"][p_idx]["laws"][l_idx]
+            self._populate_tree()
+            self.calculate()
+
+    def add_marker(self):
+        marker = {"value": 6.25, "visible": True, "label": "x = 6.25°"}
+        self.project["markers"].append(marker)
+        self._populate_tree()
+        self.calculate()
+
+    # ============================
+    # CALCULATION & PLOTTING
+    # ============================
+    def calculate(self):
+        for ax in self.axes.flat:
+            ax.clear()
+
+        # Clear table
+        for item in self.detail_table.get_children():
+            self.detail_table.delete(item)
+
+        selected_node = self.project_tree.selection()
+        selected_law_idx = None
+        if selected_node:
+            node_type, data = self.node_map.get(selected_node[0], (None, None))
+            if node_type == "law":
+                selected_law_idx = data[1]
+
+        # Process profiles
+        for p_idx, profile in enumerate(self.project["profiles"]):
+            if not profile["visible"] or not profile["laws"]:
+                continue
+
+            segs = [MotionSegment(l["type"], l["stroke"], l["duration"]) for l in profile["laws"]]
+            t, s, v, a, j = compute_cam_motion(segs)
+
+            # Offset initial position
+            s = s + profile["start_pos"] - s[0]
+
+            # Populate table
+            for l in profile["laws"]:
+                self.detail_table.insert("", "end", values=(
+                    l["name"], l["cv"], l["ca"],
+                    f"{l['duration']} s", f"{l['parz_fin']} s" if l['parz_fin'] else f"{l['duration']} s",
+                    f"{l['stroke']} mm", f"{l['stroke']} mm",
+                    f"{l['v_ini']} mm/s", f"{l['v_ini']} mm/s",
+                    f"{l['v_fin']} mm/s", f"{l['v_fin']} mm/s",
+                    f"{l['a_ini']} mm/s²", f"{l['a_ini']} mm/s²",
+                    f"{l['a_fin']} mm/s²", f"{l['a_fin']} mm/s²",
+                    "0 mm/s³", "-460.695 mm/s³",
+                    "0 mm/s³", "-460.695 mm/s³"
+                ))
+
+            # Segment splitting for highlighting
+            pts_per_seg = len(t) // max(1, len(profile["laws"]))
+            
+            for l_idx in range(len(profile["laws"])):
+                i_start = l_idx * pts_per_seg
+                i_end = (l_idx + 1) * pts_per_seg if l_idx < len(profile["laws"]) - 1 else len(t)
+
+                color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else "orange"
+
+                self.axes[0, 0].plot(t[i_start:i_end], s[i_start:i_end], color=color)
+                self.axes[0, 1].plot(t[i_start:i_end], v[i_start:i_end], color=color)
+                self.axes[1, 0].plot(t[i_start:i_end], a[i_start:i_end], color=color)
+                self.axes[1, 1].plot(t[i_start:i_end], j[i_start:i_end], color=color)
+
+        # Plot markers
+        for marker in self.project["markers"]:
+            if marker["visible"]:
+                for ax in self.axes.flat:
+                    ax.axvline(x=marker["value"], color="red", linestyle="-", alpha=0.7)
+
+        titles = [["Spostamento", "Velocità"], ["Accelerazione", "Jerk"]]
+        for row in range(2):
+            for col in range(2):
+                ax = self.axes[row, col]
+                ax.set_title(titles[row][col])
+                ax.grid(True, linestyle="--", alpha=0.5)
+
+        self.fig.tight_layout()
+        self.canvas.draw()
 
     # ============================
     # MOTION LIST
