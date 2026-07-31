@@ -31,7 +31,7 @@ def export_to_ibl(project, plot_type):
             y_data = j
         break
 
-    if not all_t:
+    if len(all_t) == 0:
         messagebox.showwarning("Attenzione", "Nessun dato visibile da esportare.")
         return
 
