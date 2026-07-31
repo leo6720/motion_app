@@ -552,28 +552,6 @@ class MotionApp(tk.Tk):
         e_x.bind("<KeyRelease>", on_x_change)
         e_lbl.bind("<KeyRelease>", on_label_change)
 
-        def on_x_change(event):
-            try:
-                val = float(e_x.get())
-                marker["value"] = val
-                if not marker.get("custom_label", False):
-                    marker["label"] = f"x = {val}°"
-                    e_lbl.delete(0, tk.END)
-                    e_lbl.insert(0, marker["label"])
-                self._populate_tree()
-                self.calculate()
-            except ValueError:
-                pass
-
-        def on_label_change(event):
-            marker["label"] = e_lbl.get()
-            marker["custom_label"] = True
-            self._populate_tree()
-            self.calculate()
-
-        e_x.bind("<KeyRelease>", on_x_change)
-        e_lbl.bind("<KeyRelease>", on_label_change)
-
     # ============================
     # PROJECT & MENU ACTIONS
     # ============================
