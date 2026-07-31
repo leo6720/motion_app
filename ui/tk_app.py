@@ -531,14 +531,15 @@ class MotionApp(tk.Tk):
             raw_val = law.get(key, "")
             entry.insert(0, str(raw_val))
             entry.grid(row=i, column=1, sticky="e", pady=2)
-            clean_unit = unit.strip()
-            if clean_unit:
-                ttk.Label(tab_gen, text=clean_unit).grid(row=i, column=2, sticky="w", padx=2, pady=2)
-
+            
             if unit_x == "s" and key == "phase":
                 entry.config(state="disabled")
             elif unit_x == "°" and key == "duration":
                 entry.config(state="disabled")
+
+            clean_unit = unit.strip()
+            if clean_unit:
+                ttk.Label(tab_gen, text=clean_unit).grid(row=i, column=2, sticky="w", padx=2, pady=2)
 
             def make_law_updater(k, t, ent):
                 def updater(event):
