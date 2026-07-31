@@ -26,41 +26,52 @@ def _poly_4567(tau):
     return x, dx, ddx, dddx, "S-curve"
 
 
-def _trapezoidal(tau, lam=0.25):
+def _trapezoidal(tau, params=None):
+    import numpy as np
+    default_profile = [10, 20, 10, 0, 10, 20, 10]
+    if params is None:
+        profile = default_profile
+    else:
+        profile = params.get("profile", params.get("proportions", default_profile))
+    profile = np.array(profile, dtype=float)
+    if len(profile) != 7 or profile.sum() == 0:
+        profile = np.array(default_profile, dtype=float)
+    profile = profile / profile.sum()
+    b = np.concatenate(([0.0], np.cumsum(profile)))
+
+    jerk_pattern = np.array([1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0], dtype=float)
+    j = np.zeros_like(tau)
+    for i in range(7):
+        if i == 6:
+            mask = (tau >= b[i]) & (tau <= b[i+1])
+        else:
+            mask = (tau >= b[i]) & (tau < b[i+1])
+        j[mask] = jerk_pattern[i]
+
+    dt = tau[1] - tau[0] if len(tau) > 1 else 1.0
+    a = np.zeros_like(tau)
+    v = np.zeros_like(tau)
     x = np.zeros_like(tau)
-    dx = np.zeros_like(tau)
-    ddx = np.zeros_like(tau)
-    dddx = np.zeros_like(tau)
+    for i in range(1, len(tau)):
+        a[i] = a[i-1] + j[i-1] * dt
+        v[i] = v[i-1] + a[i-1] * dt
+        x[i] = x[i-1] + v[i-1] * dt
 
-    vmax = 1.0 / (1.0 - lam)
-    acc = vmax / lam
+    if x[-1] != 0:
+        x = x / x[-1]
+    vmax = np.max(np.abs(v))
+    if vmax > 0:
+        v = v / vmax
+    amax = np.max(np.abs(a))
+    if amax > 0:
+        a = a / amax
 
-    m1 = tau < lam
-    m2 = (tau >= lam) & (tau <= 1.0 - lam)
-    m3 = tau > 1.0 - lam
+    return x, v, a, j, "trapezoidale"
 
-    x[m1] = 0.5 * acc * tau[m1]**2
-    dx[m1] = acc * tau[m1]
-    ddx[m1] = acc
-
-    x_lam = 0.5 * acc * lam**2
-
-    x[m2] = x_lam + vmax * (tau[m2] - lam)
-    dx[m2] = vmax
-    ddx[m2] = 0
-
-    x[m3] = 1 - 0.5 * acc * (1 - tau[m3])**2
-    dx[m3] = acc * (1 - tau[m3])
-    ddx[m3] = -acc
-
-    return x, dx, ddx, dddx, "trapezoidale"
 
 def _trapezoidal_generalized(tau, params=None):
     import numpy as np
 
-    # =========================
-    # PARAMETRI
-    # =========================
     default_profile = [10, 20, 10, 0, 10, 20, 10]
     if params is None:
         profile = default_profile
@@ -68,20 +79,11 @@ def _trapezoidal_generalized(tau, params=None):
         profile = params.get("profile", params.get("proportions", default_profile))
 
     profile = np.array(profile, dtype=float)
-
     if len(profile) != 7 or profile.sum() == 0:
         profile = np.array(default_profile, dtype=float)
 
-    # normalizza a [0..1]
     profile = profile / profile.sum()
-
-    # breakpoint
     b = np.concatenate(([0.0], np.cumsum(profile)))
-
-    # =========================
-    # JERK (Rectangular Pulses / Steps)
-    # =========================
-    jerk_pattern = np.array([1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0], dtype=float)
 
     j = np.zeros_like(tau)
 
@@ -90,41 +92,53 @@ def _trapezoidal_generalized(tau, params=None):
             mask = (tau >= b[i]) & (tau <= b[i+1])
         else:
             mask = (tau >= b[i]) & (tau < b[i+1])
-        j[mask] = jerk_pattern[i]
+        
+        dur = b[i+1] - b[i]
+        if dur > 0:
+            tau_local = (tau[mask] - b[i]) / dur
+        else:
+            tau_local = np.zeros_like(tau[mask])
 
-    # =========================
-    # INTEGRAZIONE
-    # =========================
-    dt = tau[1] - tau[0]
+        if i == 0:
+            # 1) cycloidal blend from a=0 to +Amax: j = Jmax * cos(pi * tau / 2)
+            j[mask] = np.cos(np.pi * tau_local / 2.0)
+        elif i == 1:
+            # 2) constant acceleration +Amax: j = 0
+            j[mask] = 0.0
+        elif i == 2:
+            # 3) cycloidal blend from +Amax to 0: j = -Jmax * cos(pi * tau / 2)
+            j[mask] = -np.cos(np.pi * tau_local / 2.0)
+        elif i == 3:
+            # 4) constant velocity (duration = 0)
+            j[mask] = 0.0
+        elif i == 4:
+            # 5) cycloidal blend from 0 to -Amax: j = -Jmax * cos(pi * tau / 2)
+            j[mask] = -np.cos(np.pi * tau_local / 2.0)
+        elif i == 5:
+            # 6) constant acceleration -Amax: j = 0
+            j[mask] = 0.0
+        elif i == 6:
+            # 7) cycloidal blend from -Amax to 0: j = Jmax * cos(pi * tau / 2)
+            j[mask] = np.cos(np.pi * tau_local / 2.0)
 
+    dt = tau[1] - tau[0] if len(tau) > 1 else 1.0
     a = np.zeros_like(tau)
     v = np.zeros_like(tau)
     x = np.zeros_like(tau)
 
-    for i in range(1, len(tau)):
-        a[i] = a[i-1] + j[i-1] * dt
-        v[i] = v[i-1] + a[i-1] * dt
-        x[i] = x[i-1] + v[i-1] * dt
+    for idx in range(1, len(tau)):
+        a[idx] = a[idx-1] + j[idx-1] * dt
+        v[idx] = v[idx-1] + a[idx-1] * dt
+        x[idx] = x[idx-1] + v[idx-1] * dt
 
-    # =========================
-    # NORMALIZZAZIONE
-    # =========================
-
-    # posizione → 0..1
     if x[-1] != 0:
         x = x / x[-1]
-
-    # velocità → scala coerente
     vmax = np.max(np.abs(v))
     if vmax > 0:
         v = v / vmax
-
-    # accelerazione → scala coerente
     amax = np.max(np.abs(a))
     if amax > 0:
         a = a / amax
-
-    # jerk → già normalizzato (±1)
 
     return x, v, a, j, "trapezoidale_generalizzata"
 

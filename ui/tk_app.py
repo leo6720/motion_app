@@ -150,6 +150,7 @@ class MotionApp(tk.Tk):
         # Leggi di moto menu
         laws_menu = tk.Menu(menubar, tearoff=0)
         new_law_menu = tk.Menu(laws_menu, tearoff=0)
+        new_law_menu.add_command(label="Trapezoidale", command=lambda: self.add_law("trapezoidal", "Trapezoidale"))
         new_law_menu.add_command(label="Trapezoidale generalizzata", command=lambda: self.add_law("trap_gen", "Trapezoidale generalizzata"))
         new_law_menu.add_command(label="Sosta", command=lambda: self.add_law("dwell", "Sosta"))
         new_law_menu.add_command(label="Cicloidale", command=lambda: self.add_law("cycloidal", "Cicloidale"))
