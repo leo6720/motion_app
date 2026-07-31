@@ -22,76 +22,166 @@ class MotionApp(tk.Tk):
         self.motion_sets = []
         self.current = None
 
-        self.title("Simulatore Leggi di Moto")
-        self.iconbitmap("Motion_app_logo.ico")
-        self.geometry("1200x800")
+        self.title("Progettazione Camme - Simulatore Leggi di Moto")
+        try:
+            self.iconbitmap("Motion_app_logo.ico")
+        except Exception:
+            pass
+        self.geometry("1400x900")
 
+        self._build_menu()
         self._build_ui()
 
     # ============================
-    # UI
+    # MENU BAR
+    # ============================
+    def _build_menu(self):
+        menubar = tk.Menu(self)
+
+        menubar.add_cascade(label="File", menu=tk.Menu(menubar, tearoff=0))
+        menubar.add_cascade(label="Modifica", menu=tk.Menu(menubar, tearoff=0))
+        menubar.add_cascade(label="Profili di moto", menu=tk.Menu(menubar, tearoff=0))
+        menubar.add_cascade(label="Leggi di moto", menu=tk.Menu(menubar, tearoff=0))
+        menubar.add_cascade(label="Strumenti", menu=tk.Menu(menubar, tearoff=0))
+        menubar.add_cascade(label="Parametrizzazione", menu=tk.Menu(menubar, tearoff=0))
+        menubar.add_cascade(label="Opzioni", menu=tk.Menu(menubar, tearoff=0))
+
+        self.config(menu=menubar)
+
+    # ============================
+    # UI LAYOUT
     # ============================
     def _build_ui(self):
+        # Vertical split: Top (Tree + Plots) / Bottom (Table)
+        v_paned = ttk.PanedWindow(self, orient=tk.VERTICAL)
+        v_paned.pack(fill=tk.BOTH, expand=True)
 
-        main = ttk.Frame(self)
-        main.pack(fill=tk.BOTH, expand=True)
+        top_paned = ttk.PanedWindow(v_paned, orient=tk.HORIZONTAL)
+        v_paned.add(top_paned, weight=4)
 
-        # layout a 3 colonne
-        main.columnconfigure(0, weight=0)  # left
-        main.columnconfigure(1, weight=0)  # center
-        main.columnconfigure(2, weight=1)  # plot
+        # ================= LEFT SIDEBAR =================
+        left_frame = ttk.Frame(top_paned, width=320, padding=2)
+        top_paned.add(left_frame, weight=0)
 
-        main.rowconfigure(0, weight=1)
+        # 1. Project Hierarchy Tree
+        tree_frame = ttk.Frame(left_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
 
-        # ================= LEFT =================
-        left = ttk.Frame(main, padding=5)
-        left.grid(row=0, column=0, sticky="ns")
+        self.project_tree = ttk.Treeview(tree_frame, show="tree")
+        self.project_tree.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(left, text="Movimenti").pack(anchor="w")
-
-        self.motion_list = MotionList(left, self.load)
-
-        ttk.Button(left, text="+", command=self.add_motion).pack(fill=tk.X)
-        ttk.Button(left, text="-", command=self.remove_motion).pack(fill=tk.X)
-
-        # ================= CENTER =================
-        center = ttk.Frame(main, padding=5)
-        center.grid(row=0, column=1, sticky="ns")
-
-        ttk.Label(center, text="Segmenti").pack(anchor="w")
-
+        root_node = self.project_tree.insert("", "end", text="Nuovo Progetto", open=True)
+        self.profile_node = self.project_tree.insert(root_node, "end", text="☑ Nuovo Profilo", open=True)
         
-        seg_container = ttk.Frame(center)
-        seg_container.pack(fill=tk.X)
+        # Sample items under profile
+        self.project_tree.insert(self.profile_node, "end", text="Trapezoidale generalizzata")
+        self.project_tree.insert(self.profile_node, "end", text="Sosta")
+        self.project_tree.insert(self.profile_node, "end", text="Trapezoidale generalizzata")
+        self.project_tree.insert(self.profile_node, "end", text="Sosta")
 
+        self.markers_node = self.project_tree.insert(root_node, "end", text="Markers", open=True)
+        self.project_tree.insert(self.markers_node, "end", text="☑ x = 6.25°")
 
-        self.editor = SegmentEditor(seg_container)
-        
-        self.editor.on_law_change = self.show_params
+        self.project_tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
-        ttk.Button(center, text="Aggiungi segmento",
-                   command=self.add_segment).pack(fill=tk.X, pady=2)
+        # 2. Contextual Editor Frame
+        self.editor_container = ttk.LabelFrame(left_frame, text="Editor Legge", padding=5)
+        self.editor_container.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Button(center, text="Calcola",
-                   command=self.calculate).pack(fill=tk.X, pady=5)
-                   
-        # ==== parametri legge ====
-        param_frame = ttk.LabelFrame(center, text="Parametri legge")
-        param_frame.pack(fill=tk.X, pady=10)
+        self._build_profile_editor()
 
-        self.param_frame = param_frame
+        # ================= RIGHT PLOTS (2x2 Grid) =================
+        right_frame = ttk.Frame(top_paned, padding=2)
+        top_paned.add(right_frame, weight=1)
 
-        self.param_widgets = {}
+        self.fig = Figure(figsize=(8, 6))
+        # 2x2 layout for Spostamento, Velocità, Accelerazione, Jerk
+        self.axes = self.fig.subplots(2, 2, sharex=True)
+        self.ax_pos = self.axes[0, 0]
+        self.ax_vel = self.axes[0, 1]
+        self.ax_acc = self.axes[1, 0]
+        self.ax_jrk = self.axes[1, 1]
 
-        # ================= RIGHT =================
-        right = ttk.Frame(main, padding=5)
-        right.grid(row=0, column=2, sticky="nsew")
-
-        self.fig = Figure(figsize=(6, 6))
-        self.axes = self.fig.subplots(4, 1, sharex=True)
-
-        self.canvas = FigureCanvasTkAgg(self.fig, master=right)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=right_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # ================= BOTTOM DATA TABLE =================
+        bottom_frame = ttk.Frame(v_paned, padding=2)
+        v_paned.add(bottom_frame, weight=1)
+
+        self.bottom_notebook = ttk.Notebook(bottom_frame)
+        self.bottom_notebook.pack(fill=tk.BOTH, expand=True)
+
+        # Tab 1: Dettaglio input
+        tab_detail = ttk.Frame(self.bottom_notebook)
+        self.bottom_notebook.add(tab_detail, text="Dettaglio input")
+
+        table_cols = ("tipo", "cv", "ca", "fase_t", "fase_e", "salto_t", "salto_e", 
+                      "v_ini_t", "v_ini_e", "v_fin_t", "v_fin_e", 
+                      "a_ini_t", "a_ini_e", "a_fin_t", "a_fin_e", 
+                      "j_ini_t", "j_ini_e", "j_fin_t", "j_fin_e")
+
+        self.detail_table = ttk.Treeview(tab_detail, columns=table_cols, show="headings", height=5)
+        self.detail_table.pack(fill=tk.BOTH, expand=True)
+
+        headers = [
+            ("tipo", "Tipo"), ("cv", "Cv"), ("ca", "Ca"),
+            ("fase_t", "Fase Teorica"), ("fase_e", "Fase Effettiva"),
+            ("salto_t", "Salto Teorico"), ("salto_e", "Salto Effettivo"),
+            ("v_ini_t", "V.Ini Teorica"), ("v_ini_e", "V.Ini Effettiva"),
+            ("v_fin_t", "V.Fin Teorica"), ("v_fin_e", "V.Fin Effettiva"),
+            ("a_ini_t", "A.Ini Teorica"), ("a_ini_e", "A.Ini Effettiva"),
+            ("a_fin_t", "A.Fin Teorica"), ("a_fin_e", "A.Fin Effettiva"),
+            ("j_ini_t", "J.Ini Teorico"), ("j_ini_e", "J.Ini Effettivo"),
+            ("j_fin_t", "J.Fin Teorico"), ("j_fin_e", "J.Fin Effettivo")
+        ]
+        for col_id, col_name in headers:
+            self.detail_table.heading(col_id, text=col_name)
+            self.detail_table.column(col_id, width=80, anchor="center")
+
+        # Tab 2: Max/min profilo
+        tab_maxmin = ttk.Frame(self.bottom_notebook)
+        self.bottom_notebook.add(tab_maxmin, text="Max/min profilo")
+
+    def _build_profile_editor(self):
+        for child in self.editor_container.winfo_children():
+            child.destroy()
+
+        editor_nb = ttk.Notebook(self.editor_container)
+        editor_nb.pack(fill=tk.BOTH, expand=True)
+
+        tab_gen = ttk.Frame(editor_nb, padding=5)
+        editor_nb.add(tab_gen, text="Input generici")
+        editor_nb.add(ttk.Frame(editor_nb), text="Input specifici")
+        editor_nb.add(ttk.Frame(editor_nb), text="Output")
+
+        fields = [
+            ("Fase", "125.0 °"),
+            ("Durata", "6.25 s"),
+            ("Salto", "-600.0 mm"),
+            ("Velocità iniziale", "0.0 mm/s"),
+            ("Accelerazione iniziale", "0.0 mm/s²"),
+            ("Velocità finale", "0.0 mm/s"),
+            ("Accelerazione finale", "0.0 mm/s²"),
+        ]
+
+        for i, (label_text, val) in enumerate(fields):
+            ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
+            entry = ttk.Entry(tab_gen, width=12)
+            entry.insert(0, val)
+            entry.grid(row=i, column=1, sticky="e", pady=2)
+
+    def _on_tree_select(self, event):
+        selected = self.project_tree.selection()
+        if not selected:
+            return
+        item_text = self.project_tree.item(selected[0], "text")
+        if "Profilo" in item_text:
+            self.editor_container.config(text="Editor Profilo")
+        elif "x =" in item_text or "Marker" in item_text:
+            self.editor_container.config(text="Editor Marker")
+        else:
+            self.editor_container.config(text="Editor Legge")
 
     # ============================
     # MOTION LIST
