@@ -21,10 +21,13 @@ from ui.segment_editor import SegmentEditor
 from ui.motion_list import MotionList
 
 def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except AttributeError:
-        base_path = os.path.dirname(os.path.abspath(__file__))
+        # If not bundled, use the directory of the main script (root)
+        base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
 
@@ -41,7 +44,7 @@ class MotionApp(tk.Tk):
 
         self.title("Progettazione Camme")
         try:
-            self.iconbitmap(resource_path("stick_optimizer_logo.ico"))
+            self.iconbitmap(resource_path("Motion_app_logo.ico"))
         except Exception:
             pass
         self.geometry("1400x900")
