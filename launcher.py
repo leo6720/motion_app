@@ -8,7 +8,7 @@ import zipfile
 
 # CONFIGURAZIONE
 GITHUB_USER = "leo6720"
-GITHUB_REPO = "stick_optimizer"
+GITHUB_REPO = "cam_motion_designer"
 BRANCH = "main"
 MAIN_SCRIPT = "main.py"
 
