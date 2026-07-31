@@ -177,7 +177,7 @@ class MotionApp(tk.Tk):
         v_paned.pack(fill=tk.BOTH, expand=True)
 
         top_paned = ttk.PanedWindow(v_paned, orient=tk.HORIZONTAL)
-        v_paned.add(top_paned, weight=6)
+        v_paned.add(top_paned, weight=10)
 
         # ================= LEFT SIDEBAR =================
         left_frame = ttk.Frame(top_paned, width=800, padding=2)
