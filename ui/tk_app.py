@@ -756,7 +756,7 @@ class MotionApp(tk.Tk):
             sum_laws = sum(l.get(key_name, 0.0) for l in profile["laws"])
             cycle_duration = profile.get("cycle_duration", sum_laws if sum_laws > 0 else 1.0)
 
-            segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0), params={"proportions": l.get("proportions")} if l.get("proportions") is not None else {}) for l in profile["laws"]]
+            segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0), proportions=l.get("proportions"), params={"proportions": l.get("proportions")} if l.get("proportions") is not None else {}) for l in profile["laws"]]
             t, s, v, a, j = compute_cam_motion(segs)
 
             # Offset initial position
