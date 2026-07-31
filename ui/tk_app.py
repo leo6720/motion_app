@@ -253,6 +253,21 @@ class MotionApp(tk.Tk):
         tab_maxmin = ttk.Frame(self.bottom_notebook)
         self.bottom_notebook.add(tab_maxmin, text="Max/min profilo")
 
+        maxmin_cols = ("tipo", "s_min", "s_max", "v_min", "v_max", "a_min", "a_max", "j_min", "j_max")
+        self.maxmin_table = ttk.Treeview(tab_maxmin, columns=maxmin_cols, show="headings", height=5)
+        self.maxmin_table.pack(fill=tk.BOTH, expand=True)
+
+        maxmin_headers = [
+            ("tipo", "Tipo"),
+            ("s_min", "Min Spostamento"), ("s_max", "Max Spostamento"),
+            ("v_min", "Min Velocità"), ("v_max", "Max Velocità"),
+            ("a_min", "Min Accelerazione"), ("a_max", "Max Accelerazione"),
+            ("j_min", "Min Jerk"), ("j_max", "Max Jerk")
+        ]
+        for col_id, col_name in maxmin_headers:
+            self.maxmin_table.heading(col_id, text=col_name)
+            self.maxmin_table.column(col_id, width=100, anchor="center")
+
     # ============================
     # TREE MANAGEMENT
     # ============================
@@ -738,9 +753,11 @@ class MotionApp(tk.Tk):
         for ax in self.axes.flat:
             ax.clear()
 
-        # Clear table
+        # Clear tables
         for item in self.detail_table.get_children():
             self.detail_table.delete(item)
+        for item in self.maxmin_table.get_children():
+            self.maxmin_table.delete(item)
 
         selected_node = self.project_tree.selection()
         selected_law_idx = None
@@ -764,35 +781,62 @@ class MotionApp(tk.Tk):
             t, s, v, a, j = compute_cam_motion(segs)
 
             # Offset initial position
-            s = s + profile["start_pos"] - s[0]
+            s_offset = profile["start_pos"] - s[0]
+            s = s + s_offset
 
-            # Populate table
-            for l in profile["laws"]:
-                self.detail_table.insert("", "end", values=(
-                    l["name"], l["cv"], l["ca"],
-                    f"{l['duration']} s", f"{l['parz_fin']} s" if l['parz_fin'] else f"{l['duration']} s",
-                    f"{l['stroke']} mm", f"{l['stroke']} mm",
-                    f"{l['v_ini']} mm/s", f"{l['v_ini']} mm/s",
-                    f"{l['v_fin']} mm/s", f"{l['v_fin']} mm/s",
-                    f"{l['a_ini']} mm/s²", f"{l['a_ini']} mm/s²",
-                    f"{l['a_fin']} mm/s²", f"{l['a_fin']} mm/s²",
-                    "0 mm/s³", "-460.695 mm/s³",
-                    "0 mm/s³", "-460.695 mm/s³"
-                ))
-
-            # Segment splitting for highlighting
+            # Segment splitting for calculated properties
             pts_per_seg = len(t) // max(1, len(profile["laws"]))
             
-            for l_idx in range(len(profile["laws"])):
+            for l_idx, l in enumerate(profile["laws"]):
                 i_start = l_idx * pts_per_seg
                 i_end = (l_idx + 1) * pts_per_seg if l_idx < len(profile["laws"]) - 1 else len(t)
 
+                t_seg = t[i_start:i_end]
+                s_seg = s[i_start:i_end]
+                v_seg = v[i_start:i_end]
+                a_seg = a[i_start:i_end]
+                j_seg = j[i_start:i_end]
+
+                dur_t = l.get(key_name, 0.0)
+                dur_e = t_seg[-1] - t_seg[0] if len(t_seg) > 1 else dur_t
+                stroke_t = l.get("stroke", 0.0)
+                stroke_e = s_seg[-1] - s_seg[0] if len(s_seg) > 0 else 0.0
+
+                v_ini_e = v_seg[0] if len(v_seg) > 0 else 0.0
+                v_fin_e = v_seg[-1] if len(v_seg) > 0 else 0.0
+                a_ini_e = a_seg[0] if len(a_seg) > 0 else 0.0
+                a_fin_e = a_seg[-1] if len(a_seg) > 0 else 0.0
+                j_ini_e = j_seg[0] if len(j_seg) > 0 else 0.0
+                j_fin_e = j_seg[-1] if len(j_seg) > 0 else 0.0
+
+                # Dettaglio input row
+                self.detail_table.insert("", "end", values=(
+                    l["name"], l.get("cv", "-"), l.get("ca", "-"),
+                    f"{dur_t} {unit_x}", f"{dur_e:.3f} {unit_x}",
+                    f"{stroke_t} mm", f"{stroke_e:.3f} mm",
+                    f"{l.get('v_ini', 0.0)} mm/s", f"{v_ini_e:.3f} mm/s",
+                    f"{l.get('v_fin', 0.0)} mm/s", f"{v_fin_e:.3f} mm/s",
+                    f"{l.get('a_ini', 0.0)} mm/s²", f"{a_ini_e:.3f} mm/s²",
+                    f"{l.get('a_fin', 0.0)} mm/s²", f"{a_fin_e:.3f} mm/s²",
+                    f"{j_seg[0]:.3f} mm/s³" if len(j_seg) > 0 else "0", f"{j_ini_e:.3f} mm/s³",
+                    f"{j_seg[-1]:.3f} mm/s³" if len(j_seg) > 0 else "0", f"{j_fin_e:.3f} mm/s³"
+                ))
+
+                # Max/min profilo row
+                self.maxmin_table.insert("", "end", values=(
+                    l["name"],
+                    f"{np.min(s_seg):.2f}", f"{np.max(s_seg):.2f}",
+                    f"{np.min(v_seg):.2f}", f"{np.max(v_seg):.2f}",
+                    f"{np.min(a_seg):.2f}", f"{np.max(a_seg):.2f}",
+                    f"{np.min(j_seg):.2f}", f"{np.max(j_seg):.2f}"
+                ))
+
                 color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else "orange"
 
-                self.axes[0, 0].plot(t[i_start:i_end], s[i_start:i_end], color=color)
-                self.axes[0, 1].plot(t[i_start:i_end], v[i_start:i_end], color=color)
-                self.axes[1, 0].plot(t[i_start:i_end], a[i_start:i_end], color=color)
-                self.axes[1, 1].plot(t[i_start:i_end], j[i_start:i_end], color=color)
+                self.axes[0, 0].plot(t_seg, s_seg, color=color)
+                self.axes[0, 1].plot(t_seg, v_seg, color=color)
+                self.axes[1, 0].plot(t_seg, a_seg, color=color)
+                self.axes[1, 1].plot(t_seg, j_seg, color=color)
 
         # Plot markers
         for marker in self.project["markers"]:
