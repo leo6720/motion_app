@@ -437,26 +437,47 @@ class MotionApp(tk.Tk):
 
         for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
-            entry = ttk.Entry(tab_gen, width=14)
-            raw_val = profile.get(key, "")
-            entry.insert(0, f"{raw_val}{unit}")
-            entry.grid(row=i, column=1, sticky="e", pady=2)
+            if key == "unit_x":
+                widget = ttk.Combobox(tab_gen, values=["°", "s"], width=12, state="readonly")
+                raw_val = profile.get(key, "s")
+                widget.set(raw_val)
+                widget.grid(row=i, column=1, sticky="e", pady=2)
 
-            def make_profile_updater(k, t, u, ent):
-                def updater(event):
-                    val_str = ent.get()
-                    if u and val_str.endswith(u):
-                        val_str = val_str[:-len(u)]
-                    try:
-                        profile[k] = t(val_str.strip())
-                        if k == "name":
-                            self._populate_tree()
+                def make_unit_x_updater(w, p):
+                    def on_combobox_selected(event):
+                        val = w.get()
+                        p["unit_x"] = val
+                        if val == "°":
+                            p["cycle_duration"] = 360.0
+                        else:
+                            p["cycle_duration"] = 18.0
+                        self._show_profile_editor(p_idx)
                         self.calculate()
-                    except ValueError:
-                        pass
-                return updater
+                    return on_combobox_selected
+                widget.bind("<<ComboboxSelected>>", make_unit_x_updater(widget, profile))
+            else:
+                if key == "cycle_duration":
+                    unit = f" {profile.get('unit_x', 's')}"
+                entry = ttk.Entry(tab_gen, width=14)
+                raw_val = profile.get(key, "")
+                entry.insert(0, f"{raw_val}{unit}")
+                entry.grid(row=i, column=1, sticky="e", pady=2)
 
-            entry.bind("<KeyRelease>", make_profile_updater(key, val_type, unit, entry))
+                def make_profile_updater(k, t, u, ent):
+                    def updater(event):
+                        val_str = ent.get()
+                        if u and val_str.endswith(u):
+                            val_str = val_str[:-len(u)]
+                        try:
+                            profile[k] = t(val_str.strip())
+                            if k == "name":
+                                self._populate_tree()
+                            self.calculate()
+                        except ValueError:
+                            pass
+                    return updater
+
+                entry.bind("<KeyRelease>", make_profile_updater(key, val_type, unit, entry))
 
     def _show_law_editor(self, p_idx, l_idx):
         self._clear_editor()
@@ -476,16 +497,17 @@ class MotionApp(tk.Tk):
         tab_out = ttk.Frame(nb, padding=5)
         nb.add(tab_out, text="Output")
 
+        unit_x = profile.get("unit_x", "s")
         if law["type"] == "dwell":
             nb.tab(tab_spec, state="disabled")
             fields = [
                 ("Fase", "phase", float, " °"),
-                ("Durata", "duration", float, " s"),
+                ("Durata", "duration", float, f" {unit_x}"),
             ]
         else:
             fields = [
                 ("Fase", "phase", float, " °"),
-                ("Durata", "duration", float, " s"),
+                ("Durata", "duration", float, f" {unit_x}"),
                 ("Salto", "stroke", float, " mm"),
                 ("Velocità iniziale", "v_ini", float, " mm/s"),
                 ("Accelerazione iniziale", "a_ini", float, " mm/s²"),
@@ -518,6 +540,11 @@ class MotionApp(tk.Tk):
             raw_val = law.get(key, "")
             entry.insert(0, f"{raw_val}{unit}")
             entry.grid(row=i, column=1, sticky="e", pady=2)
+
+            if unit_x == "s" and key == "phase":
+                entry.config(state="disabled")
+            elif unit_x == "°" and key == "duration":
+                entry.config(state="disabled")
 
             def make_law_updater(k, t, u, ent):
                 def updater(event):
