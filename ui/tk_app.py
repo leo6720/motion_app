@@ -1086,10 +1086,27 @@ class MotionApp(tk.Tk):
 
                 color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else "orange"
 
-                self.axes[0, 0].plot(t_seg, s_seg, color=color)
-                self.axes[0, 1].plot(t_seg, v_seg, color=color)
-                self.axes[1, 0].plot(t_seg, a_seg, color=color)
-                self.axes[1, 1].plot(t_seg, j_seg, color=color)
+                is_mod = (profile.get("cycle_mod") == "Sì") and (cycle_duration > 0)
+                if is_mod:
+                    t_mod = t_seg % cycle_duration
+                    split_indices = np.where(np.diff(t_mod) < 0)[0] + 1
+                    t_sub_list = np.split(t_mod, split_indices)
+                    s_sub_list = np.split(s_seg, split_indices)
+                    v_sub_list = np.split(v_seg, split_indices)
+                    a_sub_list = np.split(a_seg, split_indices)
+                    j_sub_list = np.split(j_seg, split_indices)
+
+                    for ts, ss, vs, as_, js in zip(t_sub_list, s_sub_list, v_sub_list, a_sub_list, j_sub_list):
+                        if len(ts) > 0:
+                            self.axes[0, 0].plot(ts, ss, color=color)
+                            self.axes[0, 1].plot(ts, vs, color=color)
+                            self.axes[1, 0].plot(ts, as_, color=color)
+                            self.axes[1, 1].plot(ts, js, color=color)
+                else:
+                    self.axes[0, 0].plot(t_seg, s_seg, color=color)
+                    self.axes[0, 1].plot(t_seg, v_seg, color=color)
+                    self.axes[1, 0].plot(t_seg, a_seg, color=color)
+                    self.axes[1, 1].plot(t_seg, j_seg, color=color)
 
         # Plot markers
         for marker in self.project["markers"]:
