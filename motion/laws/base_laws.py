@@ -76,28 +76,45 @@ def _trapezoidal(tau, params=None):
 def _trapezoidal_generalized(tau, params=None):
     import numpy as np
 
+    try:
+        from scipy.integrate import cumulative_trapezoid
+    except ImportError:
+        cumulative_trapezoid = None
+
     default_profile = [10, 20, 10, 0, 10, 20, 10]
+
     if params is None:
         profile = default_profile
     else:
-        profile = params.get("profile", params.get("proportions", default_profile))
+        profile = params.get(
+            "profile",
+            params.get("proportions", default_profile)
+        )
 
     profile = np.array(profile, dtype=float)
+
     if len(profile) != 7 or profile.sum() == 0:
         profile = np.array(default_profile, dtype=float)
 
     profile = profile / profile.sum()
+
     b = np.concatenate(([0.0], np.cumsum(profile)))
 
-    j = np.zeros_like(tau)
+    j = np.zeros_like(tau, dtype=float)
+
+    # ------------------------------------------------------------------
+    # Normalized jerk definition
+    # ------------------------------------------------------------------
 
     for i in range(7):
+
         if i == 6:
-            mask = (tau >= b[i]) & (tau <= b[i+1])
+            mask = (tau >= b[i]) & (tau <= b[i + 1])
         else:
-            mask = (tau >= b[i]) & (tau < b[i+1])
-        
-        dur = b[i+1] - b[i]
+            mask = (tau >= b[i]) & (tau < b[i + 1])
+
+        dur = b[i + 1] - b[i]
+
         if dur > 0:
             tau_local = (tau[mask] - b[i]) / dur
         else:
@@ -116,6 +133,7 @@ def _trapezoidal_generalized(tau, params=None):
             j[mask] = -np.sin(np.pi * tau_local / 2)
 
         elif i == 3:
+            # constant velocity
             j[mask] = 0.0
 
         elif i == 4:
@@ -130,28 +148,65 @@ def _trapezoidal_generalized(tau, params=None):
             # -Amax -> 0
             j[mask] = np.sin(np.pi * tau_local / 2)
 
-    dt = tau[1] - tau[0] if len(tau) > 1 else 1.0
-    a = np.zeros_like(tau)
-    v = np.zeros_like(tau)
-    x = np.zeros_like(tau)
+    # ------------------------------------------------------------------
+    # Integration
+    # ------------------------------------------------------------------
 
-    for idx in range(1, len(tau)):
-        a[idx] = a[idx-1] + j[idx-1] * dt
-        v[idx] = v[idx-1] + a[idx-1] * dt
-        x[idx] = x[idx-1] + v[idx-1] * dt
+    if len(tau) < 2:
+        return (
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
+            "trapezoidale_generalizzata",
+        )
 
-    v[-1] = 0.0
-    a[-1] = 0.0
-    a[0] = 0.0
+    if cumulative_trapezoid is not None:
+        a = cumulative_trapezoid(j, tau, initial=0.0)
+        v = cumulative_trapezoid(a, tau, initial=0.0)
+        x = cumulative_trapezoid(v, tau, initial=0.0)
+    else:
+        # fallback if scipy unavailable
+        dt = tau[1] - tau[0]
 
-    if x[-1] != 0:
+        a = np.zeros_like(tau)
+        v = np.zeros_like(tau)
+        x = np.zeros_like(tau)
+
+        for k in range(1, len(tau)):
+            a[k] = a[k - 1] + 0.5 * (j[k - 1] + j[k]) * dt
+
+        for k in range(1, len(tau)):
+            v[k] = v[k - 1] + 0.5 * (a[k - 1] + a[k]) * dt
+
+        for k in range(1, len(tau)):
+            x[k] = x[k - 1] + 0.5 * (v[k - 1] + v[k]) * dt
+
+    # ------------------------------------------------------------------
+    # Remove tiny numerical drift without introducing discontinuities
+    # ------------------------------------------------------------------
+
+    a -= np.linspace(0.0, a[-1], len(a))
+    v -= np.linspace(0.0, v[-1], len(v))
+
+    # ------------------------------------------------------------------
+    # Normalization
+    # ------------------------------------------------------------------
+
+    if abs(x[-1]) > 1e-12:
         x = x / x[-1]
+
     vmax = np.max(np.abs(v))
-    if vmax > 0:
+    if vmax > 1e-12:
         v = v / vmax
+
     amax = np.max(np.abs(a))
-    if amax > 0:
+    if amax > 1e-12:
         a = a / amax
+
+    jmax = np.max(np.abs(j))
+    if jmax > 1e-12:
+        j = j / jmax
 
     return x, v, a, j, "trapezoidale_generalizzata"
 

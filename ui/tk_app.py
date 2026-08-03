@@ -1,5 +1,4 @@
 #
-#i now need to edit the behaviour of th fase and durata text boxes in the leggi. in editor profilo unità asse x needs to be a drop down menu where you select between ° and s. based on the selection durata ciclo should change unit of measue and its value should be the length of the x axis of the plots. based on that same selection in the editor legge one between fase and durata shoul gray out. is s is selected then fase should be greyed out and if ° is selected then durata shoul be grayed out. the one not greyed out is the one dictating the duration of that legge on the x axis. 
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -167,10 +166,43 @@ class MotionApp(tk.Tk):
         right_frame = ttk.Frame(top_paned, padding=2)
         top_paned.add(right_frame, weight=1)
 
+        # Container to allow overlaying buttons
+        plot_container = ttk.Frame(right_frame)
+        plot_container.pack(fill=tk.BOTH, expand=True)
+
         self.fig = Figure(figsize=(8, 6))
         self.axes = self.fig.subplots(2, 2)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=right_frame)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_container)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Pan & Zoom state
+        self._pan_start = None
+        self._hover_annotations = {}
+        
+        # Bind canvas events
+        self.canvas.mpl_connect("button_press_event", self._on_plot_press)
+        self.canvas.mpl_connect("button_release_event", self._on_plot_release)
+        self.canvas.mpl_connect("motion_notify_event", self._on_plot_motion)
+        self.canvas.mpl_connect("scroll_event", self._on_plot_scroll)
+
+        # Create 4 separate navigation overlays, one for each subplot
+        self.nav_frames = []
+        for i, ax in enumerate(self.axes.flat):
+            frame = ttk.Frame(plot_container)
+            # We will place them dynamically in self._update_nav_positions()
+            self.nav_frames.append(frame)
+            
+            # Capture ax in closures
+            def make_home(a=ax): return lambda: self._zoom_home_ax(a)
+            def make_zoom(factor, a=ax): return lambda: self._zoom_button_ax(factor, a)
+            
+            ttk.Button(frame, text="🏠", width=3, command=make_home()).pack(side=tk.LEFT, padx=1)
+            ttk.Button(frame, text="➕", width=3, command=make_zoom(0.8)).pack(side=tk.LEFT, padx=1)
+            ttk.Button(frame, text="➖", width=3, command=make_zoom(1.25)).pack(side=tk.LEFT, padx=1)
+
+        # Update button positions when canvas is resized/drawn.
+        # We use "+" to append the binding so we don't overwrite Matplotlib's internal resize handler.
+        self.canvas.get_tk_widget().bind("<Configure>", lambda e: self._update_nav_positions(), "+")
 
         # ================= BOTTOM DATA TABLE =================
         bottom_frame = ttk.Frame(v_paned, padding=2)
@@ -296,6 +328,7 @@ class MotionApp(tk.Tk):
         if node_type == "profile":
             label = "Nascondi Profilo" if self.project["profiles"][data]["visible"] else "Mostra Profilo"
             menu.add_command(label=label, command=lambda: self._toggle_profile_visibility(data))
+            menu.add_command(label="Cambia colore...", command=lambda: self._choose_profile_color(data))
             menu.add_separator()
             menu.add_command(label="Elimina Profilo", command=lambda: self._delete_profile_by_idx(data))
         elif node_type == "law":
@@ -304,12 +337,115 @@ class MotionApp(tk.Tk):
         elif node_type == "marker":
             label = "Nascondi Marker" if self.project["markers"][data]["visible"] else "Mostra Marker"
             menu.add_command(label=label, command=lambda: self._toggle_marker_visibility(data))
+            menu.add_command(label="Cambia colore...", command=lambda: self._choose_marker_color(data))
             menu.add_separator()
             menu.add_command(label="Elimina Marker", command=lambda: self._delete_marker_by_idx(data))
         else:
             return
 
         menu.post(event.x_root, event.y_root)
+
+    def _choose_marker_color(self, m_idx):
+        marker = self.project["markers"][m_idx]
+        current_color = marker.get("color", "#FF0000")
+
+        dialog = tk.Toplevel(self)
+        dialog.title("Scegli Colore Marker")
+        dialog.geometry("320x300")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        colors = [
+            "#FF0000", "#FF4500", "#FFA500", "#FFD700", "#FFFF00",
+            "#9ACD32", "#32CD32", "#008000", "#00FA9A", "#00FFFF",
+            "#1E90FF", "#0000FF", "#8A2BE2", "#4B0082", "#9932CC",
+            "#FF00FF", "#FF1493", "#A52A2A", "#808080", "#000000"
+        ]
+
+        lbl_frame = ttk.LabelFrame(dialog, text="Tavolozza colori", padding=10)
+        lbl_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        selected_hex = tk.StringVar(value=current_color)
+
+        def set_color(hex_val):
+            selected_hex.set(hex_val)
+
+        for idx, hex_val in enumerate(colors):
+            r = idx // 5
+            c = idx % 5
+            btn = tk.Button(lbl_frame, bg=hex_val, activebackground=hex_val, width=4, height=1,
+                            command=lambda h=hex_val: set_color(h))
+            btn.grid(row=r, column=c, padx=3, pady=3)
+
+        hex_frame = ttk.Frame(dialog, padding=10)
+        hex_frame.pack(fill=tk.X, padx=10)
+
+        ttk.Label(hex_frame, text="Codice HEX:").pack(side=tk.LEFT, padx=(0, 5))
+        e_hex = ttk.Entry(hex_frame, textvariable=selected_hex, width=12)
+        e_hex.pack(side=tk.LEFT)
+
+        def on_confirm():
+            color = selected_hex.get().strip()
+            if color:
+                marker["color"] = color
+                self.calculate()
+            dialog.destroy()
+
+        btn_frame = ttk.Frame(dialog, padding=5)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        ttk.Button(btn_frame, text="OK", command=on_confirm).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Annulla", command=dialog.destroy).pack(side=tk.RIGHT)
+
+    def _choose_profile_color(self, p_idx):
+        profile = self.project["profiles"][p_idx]
+        current_color = profile.get("color", "#FFA500")
+
+        dialog = tk.Toplevel(self)
+        dialog.title("Scegli Colore Profilo")
+        dialog.geometry("320x300")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        colors = [
+            "#FF0000", "#FF4500", "#FFA500", "#FFD700", "#FFFF00",
+            "#9ACD32", "#32CD32", "#008000", "#00FA9A", "#00FFFF",
+            "#1E90FF", "#0000FF", "#8A2BE2", "#4B0082", "#9932CC",
+            "#FF00FF", "#FF1493", "#A52A2A", "#808080", "#000000"
+        ]
+
+        lbl_frame = ttk.LabelFrame(dialog, text="Tavolozza colori", padding=10)
+        lbl_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        selected_hex = tk.StringVar(value=current_color)
+
+        def set_color(hex_val):
+            selected_hex.set(hex_val)
+
+        for idx, hex_val in enumerate(colors):
+            r = idx // 5
+            c = idx % 5
+            btn = tk.Button(lbl_frame, bg=hex_val, activebackground=hex_val, width=4, height=1,
+                            command=lambda h=hex_val: set_color(h))
+            btn.grid(row=r, column=c, padx=3, pady=3)
+
+        hex_frame = ttk.Frame(dialog, padding=10)
+        hex_frame.pack(fill=tk.X, padx=10)
+
+        ttk.Label(hex_frame, text="Codice HEX:").pack(side=tk.LEFT, padx=(0, 5))
+        e_hex = ttk.Entry(hex_frame, textvariable=selected_hex, width=12)
+        e_hex.pack(side=tk.LEFT)
+
+        def on_confirm():
+            color = selected_hex.get().strip()
+            if color:
+                profile["color"] = color
+                self.calculate()
+            dialog.destroy()
+
+        btn_frame = ttk.Frame(dialog, padding=5)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        ttk.Button(btn_frame, text="OK", command=on_confirm).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Annulla", command=dialog.destroy).pack(side=tk.RIGHT)
 
     def _delete_profile_by_idx(self, p_idx):
         if messagebox.askyesno("Conferma", "Vuoi davvero eliminare questo profilo?"):
@@ -424,9 +560,33 @@ class MotionApp(tk.Tk):
             ("Unità (asse y)", "unit_y", str, ""),
         ]
 
+        unit_x = profile.get("unit_x", "s")
+        key_dur = "duration" if unit_x == "s" else "phase"
+        laws_sum = sum(l.get(key_dur, 0.0) for l in profile.get("laws", []))
+        cycle_dur = profile.get("cycle_duration", 1.0)
+        can_enable_mod = abs(laws_sum - cycle_dur) < 1e-5
+
+        if not can_enable_mod:
+            profile["cycle_mod"] = "No"
+
         for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
-            if key == "unit_x":
+            if key == "cycle_mod":
+                combobox_state = "readonly" if can_enable_mod else "disabled"
+                widget = ttk.Combobox(tab_gen, values=["No", "Sì"], width=12, state=combobox_state)
+                raw_val = profile.get(key, "No")
+                if raw_val not in ("No", "Sì"):
+                    raw_val = "No"
+                widget.set(raw_val)
+                widget.grid(row=i, column=1, sticky="e", pady=2)
+
+                def make_cycle_mod_updater(w, p):
+                    def on_combobox_selected(event):
+                        p["cycle_mod"] = w.get()
+                        self.calculate()
+                    return on_combobox_selected
+                widget.bind("<<ComboboxSelected>>", make_cycle_mod_updater(widget, profile))
+            elif key == "unit_x":
                 widget = ttk.Combobox(tab_gen, values=["°", "s"], width=12, state="readonly")
                 raw_val = profile.get(key, "s")
                 widget.set(raw_val)
@@ -788,6 +948,138 @@ class MotionApp(tk.Tk):
 
 
     # ============================
+    # PLOT NAVIGATION & HOVER
+    # ============================
+    def _update_nav_positions(self):
+        self.fig.tight_layout()
+        # Position each navigation frame at the top-right of its corresponding subplot
+        for ax, frame in zip(self.axes.flat, self.nav_frames):
+            bbox = ax.get_position()
+            # bbox coordinates are in figure fraction: [x0, y0, x1, y1]
+            # Tkinter place uses relx, rely from top-left
+            relx = bbox.x1
+            rely = 1.0 - bbox.y1
+            frame.place(relx=relx, rely=rely, anchor="ne", x=-5, y=5)
+
+    def _zoom_home_ax(self, ax):
+        xlim_right = 1.0
+        for profile in self.project["profiles"]:
+            if profile["visible"]:
+                xlim_right = profile.get("cycle_duration", 1.0)
+                break
+        ax.set_xlim(0, xlim_right)
+
+        # Manually calculate y-limits for all lines on this axis within the x-range
+        y_min, y_max = None, None
+        for line in ax.get_lines():
+            xdata = np.asarray(line.get_xdata())
+            ydata = np.asarray(line.get_ydata())
+            if xdata is None or ydata is None or len(ydata) == 0:
+                continue
+            mask = (xdata >= 0) & (xdata <= xlim_right)
+            y_visible = ydata[mask] if np.any(mask) else ydata
+            if len(y_visible) > 0:
+                ymin, ymax = np.min(y_visible), np.max(y_visible)
+                y_min = ymin if y_min is None else min(y_min, ymin)
+                y_max = ymax if y_max is None else max(y_max, ymax)
+
+        if y_min is not None and y_max is not None:
+            dy = y_max - y_min
+            if dy == 0:
+                dy = 1.0
+            ax.set_ylim(y_min - 0.05 * dy, y_max + 0.05 * dy)
+        else:
+            ax.relim()
+            ax.autoscale_view(scalex=False, scaley=True)
+
+        self.canvas.draw()
+        self._update_nav_positions()
+
+    def _zoom_button_ax(self, factor, ax):
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_mid = sum(xlim) / 2
+        y_mid = sum(ylim) / 2
+        dx = (xlim[1] - xlim[0]) * factor / 2
+        dy = (ylim[1] - ylim[0]) * factor / 2
+        ax.set_xlim(x_mid - dx, x_mid + dx)
+        ax.set_ylim(y_mid - dy, y_mid + dy)
+        self.canvas.draw()
+        self._update_nav_positions()
+
+    def _on_plot_press(self, event):
+        if event.button == 1 and event.inaxes:
+            self._pan_start = (event.xdata, event.ydata, event.inaxes)
+
+    def _on_plot_release(self, event):
+        self._pan_start = None
+
+    def _on_plot_scroll(self, event):
+        if not event.inaxes:
+            return
+        ax = event.inaxes
+        factor = 0.8 if event.button == 'up' else 1.25
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        xdata = event.xdata if event.xdata is not None else sum(xlim)/2
+        ydata = event.ydata if event.ydata is not None else sum(ylim)/2
+        ax.set_xlim(xdata - (xdata - xlim[0]) * factor, xdata + (xlim[1] - xdata) * factor)
+        ax.set_ylim(ydata - (ydata - ylim[0]) * factor, ydata + (ylim[1] - ydata) * factor)
+        self.canvas.draw()
+        self._update_nav_positions()
+
+    def _on_plot_motion(self, event):
+        # Handle Panning
+        if self._pan_start is not None and event.inaxes == self._pan_start[2]:
+            ax = event.inaxes
+            dx = event.xdata - self._pan_start[0]
+            dy = event.ydata - self._pan_start[1]
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            ax.set_xlim(xlim[0] - dx, xlim[1] - dx)
+            ax.set_ylim(ylim[0] - dy, ylim[1] - dy)
+            self.canvas.draw()
+            self._update_nav_positions()
+            return
+
+        # Handle Hover Tooltips
+        for ax in self.axes.flat:
+            if ax in self._hover_annotations:
+                self._hover_annotations[ax].set_visible(False)
+
+        if event.inaxes:
+            ax = event.inaxes
+            # Find closest point on any line in this axis
+            closest_point = None
+            min_dist = float('inf')
+            for line in ax.get_lines():
+                xdata = line.get_xdata()
+                ydata = line.get_ydata()
+                if xdata is None or len(xdata) == 0:
+                    continue
+                # Find index of closest x
+                idx = np.abs(xdata - event.xdata).argmin()
+                dist = np.hypot(xdata[idx] - event.xdata, ydata[idx] - event.ydata)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_point = (xdata[idx], ydata[idx])
+
+            if closest_point is not None:
+                if ax not in self._hover_annotations:
+                    self._hover_annotations[ax] = ax.annotate(
+                        "", xy=(0, 0), xytext=(10, 10),
+                        textcoords="offset points",
+                        bbox=dict(boxstyle="round", fc="yellow", alpha=0.8),
+                        arrowprops=dict(arrowstyle="->")
+                    )
+                annot = self._hover_annotations[ax]
+                annot.xy = closest_point
+                annot.set_text(f"x: {closest_point[0]:.3f}\ny: {closest_point[1]:.3f}")
+                annot.set_visible(True)
+            
+        self.canvas.draw_idle()
+
+    # ============================
     # CALCULATION & PLOTTING
     # ============================
     def calculate(self):
@@ -802,9 +1094,13 @@ class MotionApp(tk.Tk):
 
         selected_node = self.project_tree.selection()
         selected_law_idx = None
+        selected_profile_idx = None
         if selected_node:
             node_type, data = self.node_map.get(selected_node[0], (None, None))
-            if node_type == "law":
+            if node_type == "profile":
+                selected_profile_idx = data
+            elif node_type == "law":
+                selected_profile_idx = data[0]
                 selected_law_idx = data[1]
 
         # Process profiles
@@ -821,7 +1117,9 @@ class MotionApp(tk.Tk):
             segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0), proportions=l.get("proportions"), params={"proportions": l.get("proportions")} if l.get("proportions") is not None else {}) for l in profile["laws"]]
             t, s, v, a, j = compute_cam_motion(segs)
 
-            # Offset initial position
+            # Offset initial phase and position
+            start_phase = profile.get("start_phase", 0.0)
+            t = t + start_phase
             s_offset = profile["start_pos"] - s[0]
             s = s + s_offset
 
@@ -853,40 +1151,73 @@ class MotionApp(tk.Tk):
                 j_ini_t = j_seg[0] if len(j_seg) > 0 else 0.0
                 j_fin_t = j_seg[-1] if len(j_seg) > 0 else 0.0
 
-                # Dettaglio input row
-                self.detail_table.insert("", "end", values=(
-                    l["name"], l.get("cv", "-"), l.get("ca", "-"),
-                    f"{dur_t} {unit_x}", f"{dur_e:.3f} {unit_x}",
-                    f"{stroke_t} mm", f"{stroke_e:.3f} mm",
-                    f"{l.get('v_ini', 0.0)} mm/s", f"{v_ini_e:.3f} mm/s",
-                    f"{l.get('v_fin', 0.0)} mm/s", f"{v_fin_e:.3f} mm/s",
-                    f"{l.get('a_ini', 0.0)} mm/s²", f"{a_ini_e:.3f} mm/s²",
-                    f"{l.get('a_fin', 0.0)} mm/s²", f"{a_fin_e:.3f} mm/s²",
-                    f"{j_ini_t:.3f} mm/s³", f"{j_ini_e:.3f} mm/s³",
-                    f"{j_fin_t:.3f} mm/s³", f"{j_fin_e:.3f} mm/s³"
-                ))
+                # Show in tables:
+                # - If a specific law is selected, only show that specific law
+                # - If a profile is selected, show all laws in that profile
+                # - Otherwise show all laws across all visible profiles
+                show_in_table = False
+                if selected_law_idx is not None:
+                    if p_idx == selected_profile_idx and l_idx == selected_law_idx:
+                        show_in_table = True
+                elif selected_profile_idx is not None:
+                    if p_idx == selected_profile_idx:
+                        show_in_table = True
+                else:
+                    show_in_table = True
 
-                # Max/min profilo row
-                self.maxmin_table.insert("", "end", values=(
-                    l["name"],
-                    f"{np.min(s_seg):.2f}", f"{np.max(s_seg):.2f}",
-                    f"{np.min(v_seg):.2f}", f"{np.max(v_seg):.2f}",
-                    f"{np.min(a_seg):.2f}", f"{np.max(a_seg):.2f}",
-                    f"{np.min(j_seg):.2f}", f"{np.max(j_seg):.2f}"
-                ))
+                if show_in_table:
+                    # Dettaglio input row
+                    self.detail_table.insert("", "end", values=(
+                        l["name"], l.get("cv", "-"), l.get("ca", "-"),
+                        f"{dur_t} {unit_x}", f"{dur_e:.3f} {unit_x}",
+                        f"{stroke_t} mm", f"{stroke_e:.3f} mm",
+                        f"{l.get('v_ini', 0.0)} mm/s", f"{v_ini_e:.3f} mm/s",
+                        f"{l.get('v_fin', 0.0)} mm/s", f"{v_fin_e:.3f} mm/s",
+                        f"{l.get('a_ini', 0.0)} mm/s²", f"{a_ini_e:.3f} mm/s²",
+                        f"{l.get('a_fin', 0.0)} mm/s²", f"{a_fin_e:.3f} mm/s²",
+                        f"{j_ini_t:.3f} mm/s³", f"{j_ini_e:.3f} mm/s³",
+                        f"{j_fin_t:.3f} mm/s³", f"{j_fin_e:.3f} mm/s³"
+                    ))
 
-                color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else "orange"
+                    # Max/min profilo row
+                    self.maxmin_table.insert("", "end", values=(
+                        l["name"],
+                        f"{np.min(s_seg):.2f}", f"{np.max(s_seg):.2f}",
+                        f"{np.min(v_seg):.2f}", f"{np.max(v_seg):.2f}",
+                        f"{np.min(a_seg):.2f}", f"{np.max(a_seg):.2f}",
+                        f"{np.min(j_seg):.2f}", f"{np.max(j_seg):.2f}"
+                    ))
 
-                self.axes[0, 0].plot(t_seg, s_seg, color=color)
-                self.axes[0, 1].plot(t_seg, v_seg, color=color)
-                self.axes[1, 0].plot(t_seg, a_seg, color=color)
-                self.axes[1, 1].plot(t_seg, j_seg, color=color)
+                color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else profile.get("color", "#FFA500")
+
+                is_mod = (profile.get("cycle_mod") == "Sì") and (cycle_duration > 0)
+                if is_mod:
+                    t_mod = t_seg % cycle_duration
+                    split_indices = np.where(np.diff(t_mod) < 0)[0] + 1
+                    t_sub_list = np.split(t_mod, split_indices)
+                    s_sub_list = np.split(s_seg, split_indices)
+                    v_sub_list = np.split(v_seg, split_indices)
+                    a_sub_list = np.split(a_seg, split_indices)
+                    j_sub_list = np.split(j_seg, split_indices)
+
+                    for ts, ss, vs, as_, js in zip(t_sub_list, s_sub_list, v_sub_list, a_sub_list, j_sub_list):
+                        if len(ts) > 0:
+                            self.axes[0, 0].plot(ts, ss, color=color)
+                            self.axes[0, 1].plot(ts, vs, color=color)
+                            self.axes[1, 0].plot(ts, as_, color=color)
+                            self.axes[1, 1].plot(ts, js, color=color)
+                else:
+                    self.axes[0, 0].plot(t_seg, s_seg, color=color)
+                    self.axes[0, 1].plot(t_seg, v_seg, color=color)
+                    self.axes[1, 0].plot(t_seg, a_seg, color=color)
+                    self.axes[1, 1].plot(t_seg, j_seg, color=color)
 
         # Plot markers
         for marker in self.project["markers"]:
             if marker["visible"]:
+                color = marker.get("color", "#FF0000")
                 for ax in self.axes.flat:
-                    ax.axvline(x=marker["value"], color="red", linestyle="-", alpha=0.7)
+                    ax.axvline(x=marker["value"], color=color, linestyle="-", alpha=0.7)
 
         titles = [["Spostamento", "Velocità"], ["Accelerazione", "Jerk"]]
         for row in range(2):
@@ -901,3 +1232,4 @@ class MotionApp(tk.Tk):
 
         self.fig.tight_layout()
         self.canvas.draw()
+        self._update_nav_positions()
