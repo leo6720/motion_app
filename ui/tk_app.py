@@ -177,6 +177,7 @@ class MotionApp(tk.Tk):
         # Pan & Zoom state
         self._pan_start = None
         self._hover_annotations = {}
+        self._maximized_ax = None
         
         # Bind canvas events
         self.canvas.mpl_connect("button_press_event", self._on_plot_press)
@@ -194,10 +195,15 @@ class MotionApp(tk.Tk):
             # Capture ax in closures
             def make_home(a=ax): return lambda: self._zoom_home_ax(a)
             def make_zoom(factor, a=ax): return lambda: self._zoom_button_ax(factor, a)
+            def make_toggle(a=ax): return lambda: self._toggle_maximize(a)
             
             ttk.Button(frame, text="🏠", width=3, command=make_home()).pack(side=tk.LEFT, padx=1)
             ttk.Button(frame, text="➕", width=3, command=make_zoom(0.8)).pack(side=tk.LEFT, padx=1)
             ttk.Button(frame, text="➖", width=3, command=make_zoom(1.25)).pack(side=tk.LEFT, padx=1)
+            btn_max = ttk.Button(frame, text="⛶", width=3, command=make_toggle())
+            btn_max.pack(side=tk.LEFT, padx=1)
+            # Store reference to change text later
+            frame.maximize_btn = btn_max
 
         # Update button positions when canvas is resized/drawn.
         # We use "+" to append the binding so we don't overwrite Matplotlib's internal resize handler.
@@ -949,9 +955,15 @@ class MotionApp(tk.Tk):
     # PLOT NAVIGATION & HOVER
     # ============================
     def _update_nav_positions(self):
-        self.fig.tight_layout()
+        if self._maximized_ax is None:
+            self.fig.tight_layout()
+        
         # Position each navigation frame at the top-right of its corresponding subplot
         for ax, frame in zip(self.axes.flat, self.nav_frames):
+            if not ax.get_visible():
+                frame.place_forget()
+                continue
+                
             bbox = ax.get_position()
             # bbox coordinates are in figure fraction: [x0, y0, x1, y1]
             # Tkinter place uses relx, rely from top-left
@@ -991,6 +1003,31 @@ class MotionApp(tk.Tk):
             ax.relim()
             ax.autoscale_view(scalex=False, scaley=True)
 
+        self.canvas.draw()
+        self._update_nav_positions()
+
+    def _toggle_maximize(self, ax):
+        if self._maximized_ax is None:
+            # Maximize
+            self._maximized_ax = ax
+            for other_ax in self.axes.flat:
+                if other_ax != ax:
+                    other_ax.set_visible(False)
+            ax.set_position([0.1, 0.1, 0.85, 0.85]) # Take up most of the figure
+        else:
+            # Restore 2x2
+            self._maximized_ax = None
+            for other_ax in self.axes.flat:
+                other_ax.set_visible(True)
+            self.fig.tight_layout()
+
+        # Update button icons
+        for a, f in zip(self.axes.flat, self.nav_frames):
+            if self._maximized_ax == a:
+                f.maximize_btn.config(text="❐")
+            else:
+                f.maximize_btn.config(text="⛶")
+        
         self.canvas.draw()
         self._update_nav_positions()
 
