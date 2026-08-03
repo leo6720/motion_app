@@ -344,6 +344,57 @@ class MotionApp(tk.Tk):
 
         menu.post(event.x_root, event.y_root)
 
+    def _choose_profile_color(self, p_idx):
+        profile = self.project["profiles"][p_idx]
+        current_color = profile.get("color", "orange")
+
+        dialog = tk.Toplevel(self)
+        dialog.title("Scegli Colore Profilo")
+        dialog.geometry("320x300")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        colors = [
+            "#FF0000", "#FF4500", "#FFA500", "#FFD700", "#FFFF00",
+            "#9ACD32", "#32CD32", "#008000", "#00FA9A", "#00FFFF",
+            "#1E90FF", "#0000FF", "#8A2BE2", "#4B0082", "#9932CC",
+            "#FF00FF", "#FF1493", "#A52A2A", "#808080", "#000000"
+        ]
+
+        lbl_frame = ttk.LabelFrame(dialog, text="Tavolozza colori", padding=10)
+        lbl_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        selected_hex = tk.StringVar(value=current_color)
+
+        def set_color(hex_val):
+            selected_hex.set(hex_val)
+
+        for idx, hex_val in enumerate(colors):
+            r = idx // 5
+            c = idx % 5
+            btn = tk.Button(lbl_frame, bg=hex_val, activebackground=hex_val, width=4, height=1,
+                            command=lambda h=hex_val: set_color(h))
+            btn.grid(row=r, column=c, padx=3, pady=3)
+
+        hex_frame = ttk.Frame(dialog, padding=10)
+        hex_frame.pack(fill=tk.X, padx=10)
+
+        ttk.Label(hex_frame, text="Codice HEX:").pack(side=tk.LEFT, padx=(0, 5))
+        e_hex = ttk.Entry(hex_frame, textvariable=selected_hex, width=12)
+        e_hex.pack(side=tk.LEFT)
+
+        def on_confirm():
+            color = selected_hex.get().strip()
+            if color:
+                profile["color"] = color
+                self.calculate()
+            dialog.destroy()
+
+        btn_frame = ttk.Frame(dialog, padding=5)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        ttk.Button(btn_frame, text="OK", command=on_confirm).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Annulla", command=dialog.destroy).pack(side=tk.RIGHT)
+
     def _delete_profile_by_idx(self, p_idx):
         if messagebox.askyesno("Conferma", "Vuoi davvero eliminare questo profilo?"):
             del self.project["profiles"][p_idx]
@@ -1085,7 +1136,7 @@ class MotionApp(tk.Tk):
                         f"{np.min(j_seg):.2f}", f"{np.max(j_seg):.2f}"
                     ))
 
-                color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else "orange"
+                color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else profile.get("color", "orange")
 
                 is_mod = (profile.get("cycle_mod") == "Sì") and (cycle_duration > 0)
                 if is_mod:
