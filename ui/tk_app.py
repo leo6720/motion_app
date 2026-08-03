@@ -960,11 +960,12 @@ class MotionApp(tk.Tk):
             frame.place(relx=relx, rely=rely, anchor="ne", x=-5, y=5)
 
     def _zoom_home_ax(self, ax):
-        xlim_right = 1.0
+        xlim_right = 0.0
         for profile in self.project["profiles"]:
             if profile["visible"]:
-                xlim_right = profile.get("cycle_duration", 1.0)
-                break
+                xlim_right = max(xlim_right, profile.get("cycle_duration", 0.0))
+        if xlim_right <= 0:
+            xlim_right = 1.0
         ax.set_xlim(0, xlim_right)
 
         # Manually calculate y-limits for all lines on this axis within the x-range
@@ -1246,16 +1247,21 @@ class MotionApp(tk.Tk):
                 for ax in self.axes.flat:
                     ax.axvline(x=marker["value"], color=color, linestyle="-", alpha=0.7)
 
+        # Set x-limits to the maximum duration among visible profiles
+        max_dur = 0.0
+        for profile in self.project["profiles"]:
+            if profile["visible"]:
+                max_dur = max(max_dur, profile.get("cycle_duration", 0.0))
+        if max_dur <= 0:
+            max_dur = 1.0
+
         titles = [["Spostamento", "Velocità"], ["Accelerazione", "Jerk"]]
         for row in range(2):
             for col in range(2):
                 ax = self.axes[row, col]
                 ax.set_title(titles[row][col])
                 ax.grid(True, linestyle="--", alpha=0.5)
-                for profile in self.project["profiles"]:
-                    if profile["visible"]:
-                        ax.set_xlim(left=0, right=profile.get("cycle_duration", 1.0))
-                        break
+                ax.set_xlim(left=0, right=max_dur)
 
         self.fig.tight_layout()
         self.canvas.draw()
