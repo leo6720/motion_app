@@ -1021,8 +1021,21 @@ class MotionApp(tk.Tk):
                 j_ini_t = j_seg[0] if len(j_seg) > 0 else 0.0
                 j_fin_t = j_seg[-1] if len(j_seg) > 0 else 0.0
 
-                # Only show in tables if no profile is selected, or if this is the selected profile
-                if selected_profile_idx is None or p_idx == selected_profile_idx:
+                # Show in tables:
+                # - If a specific law is selected, only show that specific law
+                # - If a profile is selected, show all laws in that profile
+                # - Otherwise show all laws across all visible profiles
+                show_in_table = False
+                if selected_law_idx is not None:
+                    if p_idx == selected_profile_idx and l_idx == selected_law_idx:
+                        show_in_table = True
+                elif selected_profile_idx is not None:
+                    if p_idx == selected_profile_idx:
+                        show_in_table = True
+                else:
+                    show_in_table = True
+
+                if show_in_table:
                     # Dettaglio input row
                     self.detail_table.insert("", "end", values=(
                         l["name"], l.get("cv", "-"), l.get("ca", "-"),
