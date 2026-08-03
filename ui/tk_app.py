@@ -989,7 +989,9 @@ class MotionApp(tk.Tk):
             segs = [MotionSegment(l["type"], l["stroke"], l.get(key_name, 0.0), proportions=l.get("proportions"), params={"proportions": l.get("proportions")} if l.get("proportions") is not None else {}) for l in profile["laws"]]
             t, s, v, a, j = compute_cam_motion(segs)
 
-            # Offset initial position
+            # Offset initial phase and position
+            start_phase = profile.get("start_phase", 0.0)
+            t = t + start_phase
             s_offset = profile["start_pos"] - s[0]
             s = s + s_offset
 
