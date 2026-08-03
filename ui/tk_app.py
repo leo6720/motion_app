@@ -845,8 +845,8 @@ class MotionApp(tk.Tk):
         # Manually calculate y-limits for all lines on this axis within the x-range
         y_min, y_max = None, None
         for line in ax.get_lines():
-            xdata = line.get_xdata()
-            ydata = line.get_ydata()
+            xdata = np.asarray(line.get_xdata())
+            ydata = np.asarray(line.get_ydata())
             if xdata is None or ydata is None or len(ydata) == 0:
                 continue
             mask = (xdata >= 0) & (xdata <= xlim_right)
@@ -865,7 +865,8 @@ class MotionApp(tk.Tk):
             ax.relim()
             ax.autoscale_view(scalex=False, scaley=True)
 
-        self.canvas.draw_idle()
+        self.canvas.draw()
+        self._update_nav_positions()
 
     def _zoom_button_ax(self, factor, ax):
         xlim = ax.get_xlim()
@@ -876,7 +877,8 @@ class MotionApp(tk.Tk):
         dy = (ylim[1] - ylim[0]) * factor / 2
         ax.set_xlim(x_mid - dx, x_mid + dx)
         ax.set_ylim(y_mid - dy, y_mid + dy)
-        self.canvas.draw_idle()
+        self.canvas.draw()
+        self._update_nav_positions()
 
     def _on_plot_press(self, event):
         if event.button == 1 and event.inaxes:
@@ -896,7 +898,8 @@ class MotionApp(tk.Tk):
         ydata = event.ydata if event.ydata is not None else sum(ylim)/2
         ax.set_xlim(xdata - (xdata - xlim[0]) * factor, xdata + (xlim[1] - xdata) * factor)
         ax.set_ylim(ydata - (ydata - ylim[0]) * factor, ydata + (ylim[1] - ydata) * factor)
-        self.canvas.draw_idle()
+        self.canvas.draw()
+        self._update_nav_positions()
 
     def _on_plot_motion(self, event):
         # Handle Panning
@@ -908,7 +911,8 @@ class MotionApp(tk.Tk):
             ylim = ax.get_ylim()
             ax.set_xlim(xlim[0] - dx, xlim[1] - dx)
             ax.set_ylim(ylim[0] - dy, ylim[1] - dy)
-            self.canvas.draw_idle()
+            self.canvas.draw()
+            self._update_nav_positions()
             return
 
         # Handle Hover Tooltips
