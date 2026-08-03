@@ -456,9 +456,30 @@ class MotionApp(tk.Tk):
             ("Unità (asse y)", "unit_y", str, ""),
         ]
 
+        unit_x = profile.get("unit_x", "s")
+        key_dur = "duration" if unit_x == "s" else "phase"
+        laws_sum = sum(l.get(key_dur, 0.0) for l in profile.get("laws", []))
+        cycle_dur = profile.get("cycle_duration", 1.0)
+        can_enable_mod = abs(laws_sum - cycle_dur) < 1e-5
+
         for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
-            if key == "unit_x":
+            if key == "cycle_mod":
+                combobox_state = "readonly" if can_enable_mod else "disabled"
+                widget = ttk.Combobox(tab_gen, values=["No", "Sì"], width=12, state=combobox_state)
+                raw_val = profile.get(key, "No")
+                if raw_val not in ("No", "Sì"):
+                    raw_val = "No"
+                widget.set(raw_val)
+                widget.grid(row=i, column=1, sticky="e", pady=2)
+
+                def make_cycle_mod_updater(w, p):
+                    def on_combobox_selected(event):
+                        p["cycle_mod"] = w.get()
+                        self.calculate()
+                    return on_combobox_selected
+                widget.bind("<<ComboboxSelected>>", make_cycle_mod_updater(widget, profile))
+            elif key == "unit_x":
                 widget = ttk.Combobox(tab_gen, values=["°", "s"], width=12, state="readonly")
                 raw_val = profile.get(key, "s")
                 widget.set(raw_val)
