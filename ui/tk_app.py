@@ -337,6 +337,7 @@ class MotionApp(tk.Tk):
         elif node_type == "marker":
             label = "Nascondi Marker" if self.project["markers"][data]["visible"] else "Mostra Marker"
             menu.add_command(label=label, command=lambda: self._toggle_marker_visibility(data))
+            menu.add_command(label="Cambia colore...", command=lambda: self._choose_marker_color(data))
             menu.add_separator()
             menu.add_command(label="Elimina Marker", command=lambda: self._delete_marker_by_idx(data))
         else:
@@ -1163,8 +1164,9 @@ class MotionApp(tk.Tk):
         # Plot markers
         for marker in self.project["markers"]:
             if marker["visible"]:
+                color = marker.get("color", "red")
                 for ax in self.axes.flat:
-                    ax.axvline(x=marker["value"], color="red", linestyle="-", alpha=0.7)
+                    ax.axvline(x=marker["value"], color=color, linestyle="-", alpha=0.7)
 
         titles = [["Spostamento", "Velocità"], ["Accelerazione", "Jerk"]]
         for row in range(2):
