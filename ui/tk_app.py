@@ -823,6 +823,7 @@ class MotionApp(tk.Tk):
     # PLOT NAVIGATION & HOVER
     # ============================
     def _update_nav_positions(self):
+        self.fig.tight_layout()
         # Position each navigation frame at the top-right of its corresponding subplot
         for ax, frame in zip(self.axes.flat, self.nav_frames):
             bbox = ax.get_position()
