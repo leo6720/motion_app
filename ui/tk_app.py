@@ -1149,8 +1149,10 @@ class MotionApp(tk.Tk):
 
                 # Calculate Cv and Ca coefficients
                 if l["type"] != "dwell" and abs(stroke_t) > 1e-9 and dur_t > 0:
-                    cv_val = f"{np.max(np.abs(v_seg)) / (abs(stroke_t) / dur_t):.3f}"
-                    ca_val = f"{np.max(np.abs(a_seg)) / (abs(stroke_t) / (dur_t**2)):.3f}"
+                    v_rms = np.sqrt(np.mean(v_seg**2))
+                    a_rms = np.sqrt(np.mean(a_seg**2))
+                    cv_val = f"{np.max(np.abs(v_seg)) / v_rms:.3f}" if v_rms > 1e-9 else "-"
+                    ca_val = f"{np.max(np.abs(a_seg)) / a_rms:.3f}" if a_rms > 1e-9 else "-"
                 else:
                     cv_val = "-"
                     ca_val = "-"
