@@ -1149,19 +1149,31 @@ class MotionApp(tk.Tk):
                 j_ini_t = j_seg[0] if len(j_seg) > 0 else 0.0
                 j_fin_t = j_seg[-1] if len(j_seg) > 0 else 0.0
 
-                # Calculate Cv and Ca coefficients
-                if l["type"] != "dwell" and abs(stroke_t) > 1e-9 and dur_t > 0:
-                    v_max = np.max(np.abs(v_seg))
-                    a_max = np.max(np.abs(a_seg))
+                # Calculate Cv and Ca coefficients using normalized motion (stroke=1, duration=1)
+                if l["type"] != "dwell" and dur_t > 0:
+                    # Create a normalized version of the segment to extract Cv and Ca
+                    norm_seg = [MotionSegment(
+                        l["type"], 
+                        1.0, 
+                        1.0, 
+                        proportions=l.get("proportions"), 
+                        params={"proportions": l.get("proportions")} if l.get("proportions") is not None else {}
+                    )]
+                    _, _, v_norm, a_norm, _ = compute_cam_motion(norm_seg)
+                    
+                    cv_raw = np.max(np.abs(v_norm))
+                    ca_raw = np.max(np.abs(a_norm))
+
                     if unit_x == "°":
-                        # β in radians for angular laws
-                        beta_rad = np.radians(dur_t)
-                        cv_val = f"{(v_max * beta_rad / abs(stroke_t)):.3f}"
-                        ca_val = f"{(a_max * (beta_rad**2) / abs(stroke_t)):.3f}"
+                        # Cv = v_max * beta[rad] / h. For normalized: h=1, beta=1rad.
+                        # However, standard tables often define Cv/Ca based on beta in radians.
+                        # If the law is defined over beta_rad, then s'(theta) max is Cv.
+                        cv_val = f"{cv_raw:.3f}"
+                        ca_val = f"{ca_raw:.3f}"
                     else:
-                        # Time-based laws
-                        cv_val = f"{(v_max * dur_t / abs(stroke_t)):.3f}"
-                        ca_val = f"{(a_max * (dur_t**2) / abs(stroke_t)):.3f}"
+                        # Time-based laws: Cv = v_max * T / h. For normalized: T=1, h=1.
+                        cv_val = f"{cv_raw:.3f}"
+                        ca_val = f"{ca_raw:.3f}"
                 else:
                     cv_val = "-"
                     ca_val = "-"
