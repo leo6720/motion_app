@@ -594,11 +594,12 @@ class MotionApp(tk.Tk):
                 def make_unit_x_updater(w, p):
                     def on_combobox_selected(event):
                         val = w.get()
-                        p["unit_x"] = val
-                        if val == "°":
-                            p["cycle_duration"] = 360.0
-                        else:
-                            p["cycle_duration"] = 18.0
+                        for prof in self.project["profiles"]:
+                            prof["unit_x"] = val
+                            if val == "°":
+                                prof["cycle_duration"] = 360.0
+                            else:
+                                prof["cycle_duration"] = 18.0
                         self._show_profile_editor(p_idx)
                         self.calculate()
                     return on_combobox_selected
@@ -611,7 +612,9 @@ class MotionApp(tk.Tk):
 
                 def make_unit_y_updater(w, p):
                     def on_combobox_selected(event):
-                        p["unit_y"] = w.get()
+                        val = w.get()
+                        for prof in self.project["profiles"]:
+                            prof["unit_y"] = val
                         self._show_profile_editor(p_idx)
                         self.calculate()
                     return on_combobox_selected
@@ -1150,8 +1153,15 @@ class MotionApp(tk.Tk):
                 if l["type"] != "dwell" and abs(stroke_t) > 1e-9 and dur_t > 0:
                     v_max = np.max(np.abs(v_seg))
                     a_max = np.max(np.abs(a_seg))
-                    cv_val = f"{v_max * dur_t / abs(stroke_t):.3f}"
-                    ca_val = f"{a_max * (dur_t**2) / abs(stroke_t):.3f}"
+                    if unit_x == "°":
+                        # β in radians for angular laws
+                        beta_rad = np.radians(dur_t)
+                        cv_val = f"{(v_max * beta_rad / abs(stroke_t)):.3f}"
+                        ca_val = f"{(a_max * (beta_rad**2) / abs(stroke_t)):.3f}"
+                    else:
+                        # Time-based laws
+                        cv_val = f"{(v_max * dur_t / abs(stroke_t)):.3f}"
+                        ca_val = f"{(a_max * (dur_t**2) / abs(stroke_t)):.3f}"
                 else:
                     cv_val = "-"
                     ca_val = "-"
