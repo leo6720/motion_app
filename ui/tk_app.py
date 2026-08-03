@@ -176,14 +176,6 @@ class MotionApp(tk.Tk):
         self.canvas = FigureCanvasTkAgg(self.fig, master=plot_container)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-        # Navigation buttons overlay in top-right
-        nav_frame = ttk.Frame(plot_container)
-        nav_frame.place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=10)
-        
-        ttk.Button(nav_frame, text="🏠", width=3, command=self._zoom_home).pack(side=tk.LEFT, padx=1)
-        ttk.Button(nav_frame, text="➕", width=3, command=lambda: self._zoom_button(0.8)).pack(side=tk.LEFT, padx=1)
-        ttk.Button(nav_frame, text="➖", width=3, command=lambda: self._zoom_button(1.25)).pack(side=tk.LEFT, padx=1)
-
         # Pan & Zoom state
         self._pan_start = None
         self._hover_annotations = {}
@@ -193,6 +185,24 @@ class MotionApp(tk.Tk):
         self.canvas.mpl_connect("button_release_event", self._on_plot_release)
         self.canvas.mpl_connect("motion_notify_event", self._on_plot_motion)
         self.canvas.mpl_connect("scroll_event", self._on_plot_scroll)
+
+        # Create 4 separate navigation overlays, one for each subplot
+        self.nav_frames = []
+        for i, ax in enumerate(self.axes.flat):
+            frame = ttk.Frame(plot_container)
+            # We will place them dynamically in self._update_nav_positions()
+            self.nav_frames.append(frame)
+            
+            # Capture ax in closures
+            def make_home(a=ax): return lambda: self._zoom_home_ax(a)
+            def make_zoom(factor, a=ax): return lambda: self._zoom_button_ax(factor, a)
+            
+            ttk.Button(frame, text="🏠", width=3, command=make_home()).pack(side=tk.LEFT, padx=1)
+            ttk.Button(frame, text="➕", width=3, command=make_zoom(0.8)).pack(side=tk.LEFT, padx=1)
+            ttk.Button(frame, text="➖", width=3, command=make_zoom(1.25)).pack(side=tk.LEFT, padx=1)
+
+        # Update button positions when canvas is resized/drawn
+        self.canvas.get_tk_widget().bind("<Configure>", lambda e: self._update_nav_positions())
 
         # ================= BOTTOM DATA TABLE =================
         bottom_frame = ttk.Frame(v_paned, padding=2)
@@ -812,26 +822,34 @@ class MotionApp(tk.Tk):
     # ============================
     # PLOT NAVIGATION & HOVER
     # ============================
-    def _zoom_home(self):
-        for ax in self.axes.flat:
-            ax.relim()
-            ax.autoscale_view()
-            for profile in self.project["profiles"]:
-                if profile["visible"]:
-                    ax.set_xlim(left=0, right=profile.get("cycle_duration", 1.0))
-                    break
+    def _update_nav_positions(self):
+        # Position each navigation frame at the top-right of its corresponding subplot
+        for ax, frame in zip(self.axes.flat, self.nav_frames):
+            bbox = ax.get_position()
+            # bbox coordinates are in figure fraction: [x0, y0, x1, y1]
+            # Tkinter place uses relx, rely from top-left
+            relx = bbox.x1
+            rely = 1.0 - bbox.y1
+            frame.place(relx=relx, rely=rely, anchor="ne", x=-5, y=5)
+
+    def _zoom_home_ax(self, ax):
+        ax.relim()
+        ax.autoscale_view()
+        for profile in self.project["profiles"]:
+            if profile["visible"]:
+                ax.set_xlim(left=0, right=profile.get("cycle_duration", 1.0))
+                break
         self.canvas.draw_idle()
 
-    def _zoom_button(self, factor):
-        for ax in self.axes.flat:
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            x_mid = sum(xlim) / 2
-            y_mid = sum(ylim) / 2
-            dx = (xlim[1] - xlim[0]) * factor / 2
-            dy = (ylim[1] - ylim[0]) * factor / 2
-            ax.set_xlim(x_mid - dx, x_mid + dx)
-            ax.set_ylim(y_mid - dy, y_mid + dy)
+    def _zoom_button_ax(self, factor, ax):
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_mid = sum(xlim) / 2
+        y_mid = sum(ylim) / 2
+        dx = (xlim[1] - xlim[0]) * factor / 2
+        dy = (ylim[1] - ylim[0]) * factor / 2
+        ax.set_xlim(x_mid - dx, x_mid + dx)
+        ax.set_ylim(y_mid - dy, y_mid + dy)
         self.canvas.draw_idle()
 
     def _on_plot_press(self, event):
@@ -844,14 +862,14 @@ class MotionApp(tk.Tk):
     def _on_plot_scroll(self, event):
         if not event.inaxes:
             return
+        ax = event.inaxes
         factor = 0.8 if event.button == 'up' else 1.25
-        for ax in self.axes.flat:
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            xdata = event.xdata if event.xdata is not None else sum(xlim)/2
-            ydata = event.ydata if event.ydata is not None else sum(ylim)/2
-            ax.set_xlim(xdata - (xdata - xlim[0]) * factor, xdata + (xlim[1] - xdata) * factor)
-            ax.set_ylim(ydata - (ydata - ylim[0]) * factor, ydata + (ylim[1] - ydata) * factor)
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        xdata = event.xdata if event.xdata is not None else sum(xlim)/2
+        ydata = event.ydata if event.ydata is not None else sum(ylim)/2
+        ax.set_xlim(xdata - (xdata - xlim[0]) * factor, xdata + (xlim[1] - xdata) * factor)
+        ax.set_ylim(ydata - (ydata - ylim[0]) * factor, ydata + (ylim[1] - ydata) * factor)
         self.canvas.draw_idle()
 
     def _on_plot_motion(self, event):
@@ -1018,3 +1036,4 @@ class MotionApp(tk.Tk):
 
         self.fig.tight_layout()
         self.canvas.draw()
+        self._update_nav_positions()
