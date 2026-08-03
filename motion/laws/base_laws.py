@@ -205,7 +205,7 @@ def _trapezoidal_generalized(tau, params=None):
     #vmax = np.max(np.abs(v))
     #if vmax > 1e-12:
     #    v = v / vmax
-
+    #provaaaa
     #amax = np.max(np.abs(a))
     #if amax > 1e-12:
     #    a = a / amax
