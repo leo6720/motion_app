@@ -1,5 +1,4 @@
 #
-#i now need to edit the behaviour of th fase and durata text boxes in the leggi. in editor profilo unità asse x needs to be a drop down menu where you select between ° and s. based on the selection durata ciclo should change unit of measue and its value should be the length of the x axis of the plots. based on that same selection in the editor legge one between fase and durata shoul gray out. is s is selected then fase should be greyed out and if ° is selected then durata shoul be grayed out. the one not greyed out is the one dictating the duration of that legge on the x axis. 
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
