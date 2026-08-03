@@ -967,9 +967,13 @@ class MotionApp(tk.Tk):
 
         selected_node = self.project_tree.selection()
         selected_law_idx = None
+        selected_profile_idx = None
         if selected_node:
             node_type, data = self.node_map.get(selected_node[0], (None, None))
-            if node_type == "law":
+            if node_type == "profile":
+                selected_profile_idx = data
+            elif node_type == "law":
+                selected_profile_idx = data[0]
                 selected_law_idx = data[1]
 
         # Process profiles
@@ -1018,27 +1022,29 @@ class MotionApp(tk.Tk):
                 j_ini_t = j_seg[0] if len(j_seg) > 0 else 0.0
                 j_fin_t = j_seg[-1] if len(j_seg) > 0 else 0.0
 
-                # Dettaglio input row
-                self.detail_table.insert("", "end", values=(
-                    l["name"], l.get("cv", "-"), l.get("ca", "-"),
-                    f"{dur_t} {unit_x}", f"{dur_e:.3f} {unit_x}",
-                    f"{stroke_t} mm", f"{stroke_e:.3f} mm",
-                    f"{l.get('v_ini', 0.0)} mm/s", f"{v_ini_e:.3f} mm/s",
-                    f"{l.get('v_fin', 0.0)} mm/s", f"{v_fin_e:.3f} mm/s",
-                    f"{l.get('a_ini', 0.0)} mm/s²", f"{a_ini_e:.3f} mm/s²",
-                    f"{l.get('a_fin', 0.0)} mm/s²", f"{a_fin_e:.3f} mm/s²",
-                    f"{j_ini_t:.3f} mm/s³", f"{j_ini_e:.3f} mm/s³",
-                    f"{j_fin_t:.3f} mm/s³", f"{j_fin_e:.3f} mm/s³"
-                ))
+                # Only show in tables if no profile is selected, or if this is the selected profile
+                if selected_profile_idx is None or p_idx == selected_profile_idx:
+                    # Dettaglio input row
+                    self.detail_table.insert("", "end", values=(
+                        l["name"], l.get("cv", "-"), l.get("ca", "-"),
+                        f"{dur_t} {unit_x}", f"{dur_e:.3f} {unit_x}",
+                        f"{stroke_t} mm", f"{stroke_e:.3f} mm",
+                        f"{l.get('v_ini', 0.0)} mm/s", f"{v_ini_e:.3f} mm/s",
+                        f"{l.get('v_fin', 0.0)} mm/s", f"{v_fin_e:.3f} mm/s",
+                        f"{l.get('a_ini', 0.0)} mm/s²", f"{a_ini_e:.3f} mm/s²",
+                        f"{l.get('a_fin', 0.0)} mm/s²", f"{a_fin_e:.3f} mm/s²",
+                        f"{j_ini_t:.3f} mm/s³", f"{j_ini_e:.3f} mm/s³",
+                        f"{j_fin_t:.3f} mm/s³", f"{j_fin_e:.3f} mm/s³"
+                    ))
 
-                # Max/min profilo row
-                self.maxmin_table.insert("", "end", values=(
-                    l["name"],
-                    f"{np.min(s_seg):.2f}", f"{np.max(s_seg):.2f}",
-                    f"{np.min(v_seg):.2f}", f"{np.max(v_seg):.2f}",
-                    f"{np.min(a_seg):.2f}", f"{np.max(a_seg):.2f}",
-                    f"{np.min(j_seg):.2f}", f"{np.max(j_seg):.2f}"
-                ))
+                    # Max/min profilo row
+                    self.maxmin_table.insert("", "end", values=(
+                        l["name"],
+                        f"{np.min(s_seg):.2f}", f"{np.max(s_seg):.2f}",
+                        f"{np.min(v_seg):.2f}", f"{np.max(v_seg):.2f}",
+                        f"{np.min(a_seg):.2f}", f"{np.max(a_seg):.2f}",
+                        f"{np.min(j_seg):.2f}", f"{np.max(j_seg):.2f}"
+                    ))
 
                 color = "blue" if (selected_law_idx is not None and l_idx == selected_law_idx) else "orange"
 
