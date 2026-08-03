@@ -835,12 +835,12 @@ class MotionApp(tk.Tk):
             frame.place(relx=relx, rely=rely, anchor="ne", x=-5, y=5)
 
     def _zoom_home_ax(self, ax):
-        ax.relim()
-        ax.autoscale_view()
         for profile in self.project["profiles"]:
             if profile["visible"]:
                 ax.set_xlim(left=0, right=profile.get("cycle_duration", 1.0))
                 break
+        ax.relim()
+        ax.autoscale_view(scalex=False, scaley=True)
         self.canvas.draw_idle()
 
     def _zoom_button_ax(self, factor, ax):
