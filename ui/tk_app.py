@@ -1151,6 +1151,14 @@ class MotionApp(tk.Tk):
                 j_ini_t = j_seg[0] if len(j_seg) > 0 else 0.0
                 j_fin_t = j_seg[-1] if len(j_seg) > 0 else 0.0
 
+                # Calculate Cv and Ca coefficients
+                if l["type"] != "dwell" and abs(stroke_t) > 1e-9 and dur_t > 0:
+                    cv_val = f"{np.max(np.abs(v_seg)) * dur_t / abs(stroke_t):.3f}"
+                    ca_val = f"{np.max(np.abs(a_seg)) * (dur_t ** 2) / abs(stroke_t):.3f}"
+                else:
+                    cv_val = "-"
+                    ca_val = "-"
+
                 # Show in tables:
                 # - If a specific law is selected, only show that specific law
                 # - If a profile is selected, show all laws in that profile
@@ -1168,7 +1176,7 @@ class MotionApp(tk.Tk):
                 if show_in_table:
                     # Dettaglio input row
                     self.detail_table.insert("", "end", values=(
-                        l["name"], l.get("cv", "-"), l.get("ca", "-"),
+                        l["name"], cv_val, ca_val,
                         f"{dur_t} {unit_x}", f"{dur_e:.3f} {unit_x}",
                         f"{stroke_t} mm", f"{stroke_e:.3f} mm",
                         f"{l.get('v_ini', 0.0)} mm/s", f"{v_ini_e:.3f} mm/s",
