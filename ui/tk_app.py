@@ -462,6 +462,9 @@ class MotionApp(tk.Tk):
         cycle_dur = profile.get("cycle_duration", 1.0)
         can_enable_mod = abs(laws_sum - cycle_dur) < 1e-5
 
+        if not can_enable_mod:
+            profile["cycle_mod"] = "No"
+
         for i, (label_text, key, val_type, unit) in enumerate(fields):
             ttk.Label(tab_gen, text=label_text).grid(row=i, column=0, sticky="w", pady=2)
             if key == "cycle_mod":
