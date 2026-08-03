@@ -167,10 +167,32 @@ class MotionApp(tk.Tk):
         right_frame = ttk.Frame(top_paned, padding=2)
         top_paned.add(right_frame, weight=1)
 
+        # Container to allow overlaying buttons
+        plot_container = ttk.Frame(right_frame)
+        plot_container.pack(fill=tk.BOTH, expand=True)
+
         self.fig = Figure(figsize=(8, 6))
         self.axes = self.fig.subplots(2, 2)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=right_frame)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_container)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Navigation buttons overlay in top-right
+        nav_frame = ttk.Frame(plot_container)
+        nav_frame.place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=10)
+        
+        ttk.Button(nav_frame, text="🏠", width=3, command=self._zoom_home).pack(side=tk.LEFT, padx=1)
+        ttk.Button(nav_frame, text="➕", width=3, command=lambda: self._zoom_button(0.8)).pack(side=tk.LEFT, padx=1)
+        ttk.Button(nav_frame, text="➖", width=3, command=lambda: self._zoom_button(1.25)).pack(side=tk.LEFT, padx=1)
+
+        # Pan & Zoom state
+        self._pan_start = None
+        self._hover_annotations = {}
+        
+        # Bind canvas events
+        self.canvas.mpl_connect("button_press_event", self._on_plot_press)
+        self.canvas.mpl_connect("button_release_event", self._on_plot_release)
+        self.canvas.mpl_connect("motion_notify_event", self._on_plot_motion)
+        self.canvas.mpl_connect("scroll_event", self._on_plot_scroll)
 
         # ================= BOTTOM DATA TABLE =================
         bottom_frame = ttk.Frame(v_paned, padding=2)
@@ -786,6 +808,101 @@ class MotionApp(tk.Tk):
         self._populate_tree()
         self.calculate()
 
+
+    # ============================
+    # PLOT NAVIGATION & HOVER
+    # ============================
+    def _zoom_home(self):
+        for ax in self.axes.flat:
+            ax.relim()
+            ax.autoscale_view()
+            for profile in self.project["profiles"]:
+                if profile["visible"]:
+                    ax.set_xlim(left=0, right=profile.get("cycle_duration", 1.0))
+                    break
+        self.canvas.draw_idle()
+
+    def _zoom_button(self, factor):
+        for ax in self.axes.flat:
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            x_mid = sum(xlim) / 2
+            y_mid = sum(ylim) / 2
+            dx = (xlim[1] - xlim[0]) * factor / 2
+            dy = (ylim[1] - ylim[0]) * factor / 2
+            ax.set_xlim(x_mid - dx, x_mid + dx)
+            ax.set_ylim(y_mid - dy, y_mid + dy)
+        self.canvas.draw_idle()
+
+    def _on_plot_press(self, event):
+        if event.button == 1 and event.inaxes:
+            self._pan_start = (event.xdata, event.ydata, event.inaxes)
+
+    def _on_plot_release(self, event):
+        self._pan_start = None
+
+    def _on_plot_scroll(self, event):
+        if not event.inaxes:
+            return
+        factor = 0.8 if event.button == 'up' else 1.25
+        for ax in self.axes.flat:
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            xdata = event.xdata if event.xdata is not None else sum(xlim)/2
+            ydata = event.ydata if event.ydata is not None else sum(ylim)/2
+            ax.set_xlim(xdata - (xdata - xlim[0]) * factor, xdata + (xlim[1] - xdata) * factor)
+            ax.set_ylim(ydata - (ydata - ylim[0]) * factor, ydata + (ylim[1] - ydata) * factor)
+        self.canvas.draw_idle()
+
+    def _on_plot_motion(self, event):
+        # Handle Panning
+        if self._pan_start is not None and event.inaxes == self._pan_start[2]:
+            ax = event.inaxes
+            dx = event.xdata - self._pan_start[0]
+            dy = event.ydata - self._pan_start[1]
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            ax.set_xlim(xlim[0] - dx, xlim[1] - dx)
+            ax.set_ylim(ylim[0] - dy, ylim[1] - dy)
+            self.canvas.draw_idle()
+            return
+
+        # Handle Hover Tooltips
+        for ax in self.axes.flat:
+            if ax in self._hover_annotations:
+                self._hover_annotations[ax].set_visible(False)
+
+        if event.inaxes:
+            ax = event.inaxes
+            # Find closest point on any line in this axis
+            closest_point = None
+            min_dist = float('inf')
+            for line in ax.get_lines():
+                xdata = line.get_xdata()
+                ydata = line.get_ydata()
+                if xdata is None or len(xdata) == 0:
+                    continue
+                # Find index of closest x
+                idx = np.abs(xdata - event.xdata).argmin()
+                dist = np.hypot(xdata[idx] - event.xdata, ydata[idx] - event.ydata)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_point = (xdata[idx], ydata[idx])
+
+            if closest_point is not None:
+                if ax not in self._hover_annotations:
+                    self._hover_annotations[ax] = ax.annotate(
+                        "", xy=(0, 0), xytext=(10, 10),
+                        textcoords="offset points",
+                        bbox=dict(boxstyle="round", fc="yellow", alpha=0.8),
+                        arrowprops=dict(arrowstyle="->")
+                    )
+                annot = self._hover_annotations[ax]
+                annot.xy = closest_point
+                annot.set_text(f"x: {closest_point[0]:.3f}\ny: {closest_point[1]:.3f}")
+                annot.set_visible(True)
+            
+        self.canvas.draw_idle()
 
     # ============================
     # CALCULATION & PLOTTING
