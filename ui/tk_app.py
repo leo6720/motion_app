@@ -1,4 +1,3 @@
-#
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -595,11 +594,12 @@ class MotionApp(tk.Tk):
                 def make_unit_x_updater(w, p):
                     def on_combobox_selected(event):
                         val = w.get()
-                        p["unit_x"] = val
-                        if val == "°":
-                            p["cycle_duration"] = 360.0
-                        else:
-                            p["cycle_duration"] = 18.0
+                        for prof in self.project["profiles"]:
+                            prof["unit_x"] = val
+                            if val == "°":
+                                prof["cycle_duration"] = 360.0
+                            else:
+                                prof["cycle_duration"] = 18.0
                         self._show_profile_editor(p_idx)
                         self.calculate()
                     return on_combobox_selected
@@ -612,7 +612,9 @@ class MotionApp(tk.Tk):
 
                 def make_unit_y_updater(w, p):
                     def on_combobox_selected(event):
-                        p["unit_y"] = w.get()
+                        val = w.get()
+                        for prof in self.project["profiles"]:
+                            prof["unit_y"] = val
                         self._show_profile_editor(p_idx)
                         self.calculate()
                     return on_combobox_selected
@@ -821,7 +823,6 @@ class MotionApp(tk.Tk):
                                     "stroke": -60.0,
                                     "v_ini": 0.0, "a_ini": 0.0, "v_fin": 0.0, "a_fin": 0.0,
                                     "parz_ini": 0.0, "parz_fin": 0.25,
-                                    "cv": 2.0, "ca": 4.888,
                                     "proportions": [10, 20, 10, 0, 10, 20, 10]
                                 },
                                 {
@@ -829,8 +830,7 @@ class MotionApp(tk.Tk):
                                     "name": "Sosta",
                                     "phase": 10.0, "duration": 0.5, "stroke": 0.0,
                                     "v_ini": 0.0, "a_ini": 0.0, "v_fin": 0.0, "a_fin": 0.0,
-                                    "parz_ini": 0.0, "parz_fin": 0.0,
-                                    "cv": "NaN", "ca": "NaN"
+                                    "parz_ini": 0.0, "parz_fin": 0.0
                                 }
                             ]
                         }
@@ -906,8 +906,6 @@ class MotionApp(tk.Tk):
             "a_fin": 0.0,
             "parz_ini": 0.0,
             "parz_fin": 0.0 if law_type != "trap_gen" else 0.25,
-            "cv": 2.0 if law_type != "dwell" else "NaN",
-            "ca": 4.888 if law_type != "dwell" else "NaN",
             "proportions": [10, 20, 10, 0, 10, 20, 10] if law_type == "trap_gen" else []
         }
         self.project["profiles"][p_idx]["laws"].append(law)
@@ -1151,6 +1149,35 @@ class MotionApp(tk.Tk):
                 j_ini_t = j_seg[0] if len(j_seg) > 0 else 0.0
                 j_fin_t = j_seg[-1] if len(j_seg) > 0 else 0.0
 
+                # Calculate Cv and Ca coefficients using normalized motion (stroke=1, duration=1)
+                if l["type"] != "dwell" and dur_t > 0:
+                    # Create a normalized version of the segment to extract Cv and Ca
+                    norm_seg = [MotionSegment(
+                        l["type"], 
+                        1.0, 
+                        1.0, 
+                        proportions=l.get("proportions"), 
+                        params={"proportions": l.get("proportions")} if l.get("proportions") is not None else {}
+                    )]
+                    _, _, v_norm, a_norm, _ = compute_cam_motion(norm_seg)
+                    
+                    cv_raw = np.max(np.abs(v_norm))
+                    ca_raw = np.max(np.abs(a_norm))
+
+                    if unit_x == "°":
+                        # Cv = v_max * beta[rad] / h. For normalized: h=1, beta=1rad.
+                        # However, standard tables often define Cv/Ca based on beta in radians.
+                        # If the law is defined over beta_rad, then s'(theta) max is Cv.
+                        cv_val = f"{cv_raw:.3f}"
+                        ca_val = f"{ca_raw:.3f}"
+                    else:
+                        # Time-based laws: Cv = v_max * T / h. For normalized: T=1, h=1.
+                        cv_val = f"{cv_raw:.3f}"
+                        ca_val = f"{ca_raw:.3f}"
+                else:
+                    cv_val = "-"
+                    ca_val = "-"
+
                 # Show in tables:
                 # - If a specific law is selected, only show that specific law
                 # - If a profile is selected, show all laws in that profile
@@ -1168,7 +1195,7 @@ class MotionApp(tk.Tk):
                 if show_in_table:
                     # Dettaglio input row
                     self.detail_table.insert("", "end", values=(
-                        l["name"], l.get("cv", "-"), l.get("ca", "-"),
+                        l["name"], cv_val, ca_val,
                         f"{dur_t} {unit_x}", f"{dur_e:.3f} {unit_x}",
                         f"{stroke_t} mm", f"{stroke_e:.3f} mm",
                         f"{l.get('v_ini', 0.0)} mm/s", f"{v_ini_e:.3f} mm/s",

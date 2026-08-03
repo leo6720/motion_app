@@ -194,19 +194,12 @@ def _trapezoidal_generalized(tau, params=None):
     # ------------------------------------------------------------------
 
     if abs(x[-1]) > 1e-12:
-        x = x / x[-1]
+        scale = x[-1]
 
-    vmax = np.max(np.abs(v))
-    if vmax > 1e-12:
-        v = v / vmax
-
-    amax = np.max(np.abs(a))
-    if amax > 1e-12:
-        a = a / amax
-
-    jmax = np.max(np.abs(j))
-    if jmax > 1e-12:
-        j = j / jmax
+        x /= scale
+        v /= scale
+        a /= scale
+        j /= scale
 
     return x, v, a, j, "trapezoidale_generalizzata"
 

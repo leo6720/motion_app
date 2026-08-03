@@ -14,6 +14,10 @@ def compute_cam_motion(segments, n_points=1000):
 
         x, dx, ddx, dddx, _ = get_law(seg.law, tau, seg.params)
 
+        print("LAW:", seg.law)
+        print("max(dx) =", np.max(np.abs(dx)))
+        print("max(ddx) =", np.max(np.abs(ddx)))
+
         T = seg.duration
         dS = seg.stroke
 
