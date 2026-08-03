@@ -201,8 +201,9 @@ class MotionApp(tk.Tk):
             ttk.Button(frame, text="➕", width=3, command=make_zoom(0.8)).pack(side=tk.LEFT, padx=1)
             ttk.Button(frame, text="➖", width=3, command=make_zoom(1.25)).pack(side=tk.LEFT, padx=1)
 
-        # Update button positions when canvas is resized/drawn
-        self.canvas.get_tk_widget().bind("<Configure>", lambda e: self._update_nav_positions())
+        # Update button positions when canvas is resized/drawn.
+        # We use "+" to append the binding so we don't overwrite Matplotlib's internal resize handler.
+        self.canvas.get_tk_widget().bind("<Configure>", lambda e: self._update_nav_positions(), "+")
 
         # ================= BOTTOM DATA TABLE =================
         bottom_frame = ttk.Frame(v_paned, padding=2)
