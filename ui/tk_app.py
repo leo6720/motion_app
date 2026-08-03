@@ -835,12 +835,36 @@ class MotionApp(tk.Tk):
             frame.place(relx=relx, rely=rely, anchor="ne", x=-5, y=5)
 
     def _zoom_home_ax(self, ax):
+        xlim_right = 1.0
         for profile in self.project["profiles"]:
             if profile["visible"]:
-                ax.set_xlim(left=0, right=profile.get("cycle_duration", 1.0))
+                xlim_right = profile.get("cycle_duration", 1.0)
                 break
-        ax.relim()
-        ax.autoscale_view(scalex=False, scaley=True)
+        ax.set_xlim(0, xlim_right)
+
+        # Manually calculate y-limits for all lines on this axis within the x-range
+        y_min, y_max = None, None
+        for line in ax.get_lines():
+            xdata = line.get_xdata()
+            ydata = line.get_ydata()
+            if xdata is None or ydata is None or len(ydata) == 0:
+                continue
+            mask = (xdata >= 0) & (xdata <= xlim_right)
+            y_visible = ydata[mask] if np.any(mask) else ydata
+            if len(y_visible) > 0:
+                ymin, ymax = np.min(y_visible), np.max(y_visible)
+                y_min = ymin if y_min is None else min(y_min, ymin)
+                y_max = ymax if y_max is None else max(y_max, ymax)
+
+        if y_min is not None and y_max is not None:
+            dy = y_max - y_min
+            if dy == 0:
+                dy = 1.0
+            ax.set_ylim(y_min - 0.05 * dy, y_max + 0.05 * dy)
+        else:
+            ax.relim()
+            ax.autoscale_view(scalex=False, scaley=True)
+
         self.canvas.draw_idle()
 
     def _zoom_button_ax(self, factor, ax):
