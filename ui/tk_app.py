@@ -328,6 +328,7 @@ class MotionApp(tk.Tk):
         if node_type == "profile":
             label = "Nascondi Profilo" if self.project["profiles"][data]["visible"] else "Mostra Profilo"
             menu.add_command(label=label, command=lambda: self._toggle_profile_visibility(data))
+            menu.add_command(label="Cambia colore...", command=lambda: self._choose_profile_color(data))
             menu.add_separator()
             menu.add_command(label="Elimina Profilo", command=lambda: self._delete_profile_by_idx(data))
         elif node_type == "law":
